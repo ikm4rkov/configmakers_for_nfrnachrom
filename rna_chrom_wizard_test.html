@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nextflow RNA-Chrom Pipeline Wizard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 850px; margin: 2rem auto; padding: 0 1rem; background: #f8f9fa; }
+    h1 { margin-bottom: 0.2rem; }
+    .wizard-step { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 1rem; display: none; }
+    .wizard-step.active { display: block; }
+    .step-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #eee; }
+    .step-number { background: #0066cc; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem; }
+    label { display: block; margin: 0.8rem 0 0.3rem; font-weight: 500; }
+    .req::after { content: " *"; color: #d32f2f; }
+    .hint { font-size: 0.8rem; color: #666; margin-top: 0.2rem; font-style: italic; }
+    .warning { font-size: 0.8rem; color: #d32f2f; margin-top: 0.2rem; }
+    input, select { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .radio-group { display: flex; gap: 1.5rem; margin: 0.5rem 0; }
+    .radio-group label { display: flex; align-items: center; gap: 0.3rem; font-weight: normal; margin: 0; }
+    .radio-group input { width: auto; }
+    .btn { background: #0066cc; color: #fff; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
+    .btn:hover { background: #005bb5; }
+    .btn-secondary { background: #6c757d; }
+    .btn-secondary:hover { background: #5a6268; }
+    .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.9rem; }
+    .btn-success { background: #28a745; }
+    .btn-success:hover { background: #218838; }
+    textarea { width: 100%; height: 180px; margin-top: 0.5rem; font-family: monospace; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fa; }
+    .samplesheet-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+    .samplesheet-table th, .samplesheet-table td { padding: 0.4rem; border: 1px solid #eee; text-align: left; }
+    .samplesheet-table th { background: #f8f9fa; font-weight: 500; }
+    .remove-row { color: #d32f2f; cursor: pointer; font-weight: bold; background: none; border: none; font-size: 1.2rem; }
+    .remove-row:hover { color: #b71c1c; }
+    .progress-bar { display: flex; justify-content: space-between; margin: 1.5rem 0; padding: 0.5rem; background: #e9ecef; border-radius: 4px; }
+    .progress-step { flex: 1; text-align: center; padding: 0.3rem; font-size: 0.85rem; color: #666; position: relative; }
+    .progress-step.active { color: #0066cc; font-weight: 600; }
+    .progress-step::after { content: "→"; position: absolute; right: -10px; top: 50%; transform: translateY(-50%); color: #999; }
+    .progress-step:last-child::after { display: none; }
+    .conditional-field { margin-left: 1.5rem; padding-left: 1rem; border-left: 2px solid #e9ecef; margin-top: 0.5rem; }
+    .default-badge { font-size: 0.75rem; background: #e3f2fd; color: #1976d2; padding: 0.1rem 0.4rem; border-radius: 3px; margin-left: 0.3rem; }
+    .editable-hint { font-size: 0.8rem; color: #0066cc; margin-top: 0.3rem; }
+    .sample-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; align-items: end; margin: 0.8rem 0; padding: 0.8rem; background: #f8f9fa; border-radius: 4px; }
+    .section-divider { border-top: 2px dashed #dee2e6; margin: 1.5rem 0; }
+    .ref-box { font-size: 0.82rem; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>🧬 RNA-Chrom Pipeline Setup Wizard</h1>
+  <p>Step-by-step configuration for Nextflow pipeline.</p>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar">
+    <div class="progress-step active" id="progress-1">1. Experiment Setup</div>
+    <div class="progress-step" id="progress-2">2. Samplesheet</div>
+    <div class="progress-step" id="progress-3">3. Config</div>
+    <div class="progress-step" id="progress-4">4. Launch</div>
+  </div>
+
+  <!-- ===== STEP 1: EXPERIMENT SETUP ===== -->
+  <div id="step-1" class="wizard-step active">
+    <div class="step-header">
+      <h3>🔹 Experiment Setup</h3>
+      <div class="step-number">1</div>
+    </div>
+    
+    <label class="req">Experiment Group</label>
+    <select id="exp_group" onchange="updateMethodOptions()">
+      <option value="">— Select group —</option>
+      <option value="ota">One-to-All (OTA)</option>
+      <option value="ata">All-to-All (ATA)</option>
+    </select>
+    
+    <div id="method_container" style="display:none;">
+      <label class="req">Experiment Method</label>
+      <select id="exp_method" onchange="updateAtaOptions()">
+        <!-- Dynamically populated -->
+      </select>
+    </div>
+    
+    <!-- ATA-specific options -->
+    <div id="ata_options" style="display:none;">
+      <label>Chromatin Potential Analysis</label>
+      <div class="radio-group">
+        <label><input type="radio" name="chromatin_potential" value="yes" checked> Yes</label>
+        <label><input type="radio" name="chromatin_potential" value="no"> No</label>
+      </div>
+      <p class="hint">💡 Enables RNA-seq integration for chromatin state analysis.</p>
+      
+      <label>Split RNA-DNA Parts (pre-processed data)</label>
+      <div class="radio-group">
+        <label><input type="radio" name="split_rna_dna" value="yes"> Yes</label>
+        <label><input type="radio" name="split_rna_dna" value="no" checked> No</label>
+      </div>
+      <p class="hint">💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.</p>
+      
+      <div id="rnaseq_option" class="conditional-field" style="display:none;">
+        <label>Include RNA-seq samples in samplesheet</label>
+        <div class="radio-group">
+          <label><input type="radio" name="include_rnaseq" value="yes"> Yes</label>
+          <label><input type="radio" name="include_rnaseq" value="no" checked> No</label>
+        </div>
+        <p class="hint">💡 RNA-seq samples must have names starting with <code>rnaseq_</code> prefix.</p>
+      </div>
+    </div>
+
+    <!-- OTA-specific options -->
+    <div id="ota_options" style="display:none;">
+      <label>Include Input Control Samples</label>
+      <div class="radio-group">
+        <label><input type="radio" name="ota_control" value="yes"> Yes</label>
+        <label><input type="radio" name="ota_control" value="no" checked> No</label>
+      </div>
+      <p class="hint">💡 Adds a <code>control</code> column to specify input controls per sample.</p>
+    </div>
+    
+    <!-- Data type (always shown) -->
+    <label class="req">Sequencing Data Type</label>
+    <div class="radio-group">
+      <label><input type="radio" name="data_type" value="se" checked> Single-end (SE)</label>
+      <label><input type="radio" name="data_type" value="pe"> Paired-end (PE)</label>
+    </div>
+    
+    <div style="margin-top: 1.5rem; text-align: right;">
+      <button class="btn" onclick="goToStep(2)">Next: Build Samplesheet →</button>
+    </div>
+  </div>
+
+  <!-- ===== STEP 2: SAMPLESHEET BUILDER ===== -->
+  <div id="step-2" class="wizard-step">
+    <div class="step-header">
+      <h3>📋 Samplesheet Builder</h3>
+      <div class="step-number">2</div>
+    </div>
+    
+    <p class="hint" id="samplesheet_hint">Configure your input samples based on experiment settings.</p>
+    
+    <!-- Dynamic Reference Example -->
+    <div style="margin:0.8rem 0;">
+      <label>📚 Expected Format (readonly reference):</label>
+      <textarea id="samplesheet_ref" class="ref-box" readonly></textarea>
+    </div>
+
+    <!-- Experimental Samples Section -->
+    <h4>🔬 Experimental Samples</h4>
+    <div id="exp_form" class="sample-form"></div>
+    <button class="btn btn-sm" onclick="addRow('exp')">+ Add Experimental Row</button>
+    <table class="samplesheet-table" id="exp_table">
+      <thead><tr id="exp_header"></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="section-divider"></div>
+
+    <!-- Control/RNA-seq Samples Section -->
+    <div id="ctrl_section">
+      <h4 id="ctrl_title">🧬 RNA-seq / Control Samples</h4>
+      <div id="ctrl_form" class="sample-form"></div>
+      <button class="btn btn-sm" onclick="addRow('ctrl')">+ Add Control/RNA-seq Row</button>
+      <table class="samplesheet-table" id="ctrl_table">
+        <thead><tr id="ctrl_header"></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    
+    <div style="margin-top:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button class="btn" onclick="generateSamplesheet()">Generate CSV</button>
+      <button class="btn btn-secondary" onclick="downloadSamplesheet()">💾 Download samplesheet.csv</button>
+      <button class="btn btn-sm btn-secondary" onclick="clearAllRows()">Clear All</button>
+    </div>
+    
+    <textarea id="samplesheetOutput" placeholder="Generated CSV will appear here..."></textarea>
+    
+    <div style="margin-top:1.5rem; display:flex; justify-content:space-between;">
+      <button class="btn btn-secondary" onclick="goToStep(1)">← Back</button>
+      <button class="btn btn-success" onclick="goToStep(3)">Next: Generate Config →</button>
+    </div>
+  </div>
+
+  <!-- ===== STEP 3: CONFIG GENERATOR ===== -->
+  <div id="step-3" class="wizard-step">
+    <div class="step-header">
+      <h3>⚙️ Pipeline Configuration</h3>
+      <div class="step-number">3</div>
+    </div>
+    
+    <p class="hint">Most values auto-filled from your experiment setup. Edit if needed.</p>
+    
+    <div style="background:#f8f9ff; padding:1rem; border-radius:4px; margin-bottom:1rem;">
+      <strong>📋 Configuration Summary:</strong><br>
+      • Experiment: <span id="config_exp_summary"></span><br>
+      • Data type: <span id="config_data_summary"></span><br>
+      • Chromatin potential: <span id="config_chromatin_summary"></span><br>
+      • RNA-seq/Control: <span id="config_rnaseq_summary"></span>
+    </div>
+    
+    <label>Genome reference</label>
+    <select id="config_genome_mode" onchange="toggleGenomeInput()">
+      <option value="name">Use genome name (auto-download)</option>
+      <option value="fasta">Use custom FASTA path</option>
+    </select>
+    <input type="text" id="config_genome_name" placeholder="e.g., GRCh38, mm10" style="margin-top:0.3rem;">
+    <input type="text" id="config_genome_fasta" placeholder="e.g., /path/to/genome.fa" style="display:none; margin-top:0.3rem;">
+    
+    <label>Annotation BEDRC file</label>
+    <input type="text" id="config_annot_bed" placeholder="/data/genes/RNA_Chrom_genes_hg38.bedrc">
+    
+    <label>Annotation GTF file</label>
+    <input type="text" id="config_annot_gtf" placeholder="/data/genes/gencode.v35.annotation.gtf">
+    
+    <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvancedConfig()" style="margin:0.5rem 0;">Show Advanced Options</button>
+    
+    <div id="advanced_config" style="display:none;">
+      <label>Forward bridge sequence <span class="default-badge">auto-filled by method</span></label>
+      <input type="text" id="config_bridge_fwd" placeholder="e.g., AGCT or custom sequence">
+      
+      <label>Reverse bridge sequence</label>
+      <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence">
+      
+      <label>Max memory per process</label>
+      <input type="text" id="config_max_memory" value="128.GB">
+      
+      <label>Max CPUs per process</label>
+      <input type="number" id="config_max_cpus" value="16" min="1">
+    </div>
+    
+    <div style="margin-top:1rem;">
+      <button class="btn" onclick="generateConfig()">Generate nextflow.config</button>
+      <button class="btn btn-secondary" onclick="downloadConfig()">💾 Download config</button>
+    </div>
+    
+    <textarea id="configOutput" placeholder="Generated config will appear here..."></textarea>
+    <p class="editable-hint">✏️ You can edit the config above. Clicking "Generate" will update based on form values.</p>
+    
+    <div style="margin-top:1.5rem; display:flex; justify-content:space-between;">
+      <button class="btn btn-secondary" onclick="goToStep(2)">← Back</button>
+      <button class="btn btn-success" onclick="goToStep(4)">Next: Launch Command →</button>
+    </div>
+  </div>
+
+  <!-- ===== STEP 4: LAUNCH COMMAND ===== -->
+  <div id="step-4" class="wizard-step">
+    <div class="step-header">
+      <h3>🚀 Launch Pipeline</h3>
+      <div class="step-number">4</div>
+    </div>
+    
+    <p class="hint">Final command to run your pipeline. All paths auto-filled from previous steps.</p>
+    
+    <label>Pipeline repository path</label>
+    <input type="text" id="launch_pipeline" placeholder="/gpfs/user/nf-rnachrom/">
+    
+    <label>Container profile</label>
+    <select id="launch_profile">
+      <option value="singularity">singularity (recommended)</option>
+      <option value="docker">docker</option>
+      <option value="conda">conda</option>
+      <option value="local">local (no container)</option>
+    </select>
+    
+    <label>Work directory</label>
+    <input type="text" id="launch_work" placeholder="/path/to/work_dir">
+    
+    <label>Output directory</label>
+    <input type="text" id="launch_outdir" placeholder="/path/to/results">
+    
+    <div style="margin-top:1rem;">
+      <button class="btn" onclick="generateLaunchCommand()">Generate Command</button>
+      <button class="btn btn-secondary" onclick="downloadLaunchCommand()">💾 Download command.txt</button>
+      <button class="btn btn-success" onclick="finishWizard()">✅ Finish & Download All</button>
+    </div>
+    
+    <textarea id="launchOutput" placeholder="// Launch command will appear here..."></textarea>
+    <p class="hint">💡 Run this command in your terminal. You can edit before downloading.</p>
+    
+    <div style="margin-top:1.5rem; text-align:right;">
+      <button class="btn btn-secondary" onclick="goToStep(3)">← Back</button>
+    </div>
+  </div>
+
+  <script>
+    // ===== WIZARD NAVIGATION =====
+    function goToStep(stepNum) {
+      document.querySelectorAll('.wizard-step').forEach(step => step.classList.remove('active'));
+      document.querySelectorAll('.progress-step').forEach(p => p.classList.remove('active'));
+      document.getElementById(`step-${stepNum}`).classList.add('active');
+      document.getElementById(`progress-${stepNum}`).classList.add('active');
+      
+      if (stepNum === 2) setupSamplesheetUI();
+      if (stepNum === 3) autoFillConfig();
+      if (stepNum === 4) autoFillLaunchCommand();
+    }
+
+    // ===== STEP 1: EXPERIMENT SETUP =====
+    function updateMethodOptions() {
+      const group = document.getElementById('exp_group').value;
+      const methodSelect = document.getElementById('exp_method');
+      const methodContainer = document.getElementById('method_container');
+      const ataOptions = document.getElementById('ata_options');
+      const otaOptions = document.getElementById('ota_options');
+      
+      methodContainer.style.display = group ? 'block' : 'none';
+      ataOptions.style.display = group === 'ata' ? 'block' : 'none';
+      otaOptions.style.display = group === 'ota' ? 'block' : 'none';
+      methodSelect.innerHTML = '<option value="">— Select method —</option>';
+      
+      if (group === 'ota') {
+        methodSelect.innerHTML += `<option value="chirp">ChIRP-seq</option><option value="rap">RAP</option>`;
+      } else if (group === 'ata') {
+        methodSelect.innerHTML += `
+          <option value="redc">Red-C / Red-ChIP</option>
+          <option value="margi">MARGI / iMARGI</option>
+          <option value="grid">GRID-seq</option>
+          <option value="char">ChAR-seq</option>
+          <option value="radicl">RADICL-seq</option>
+        `;
+        updateAtaOptions();
+      }
+    }
+
+    function updateAtaOptions() {
+      const method = document.getElementById('exp_method').value;
+      const chromatinRadios = document.querySelectorAll('input[name="chromatin_potential"]');
+      if (method === 'redc') chromatinRadios[0].checked = true;
+      else chromatinRadios[1].checked = true;
+      toggleRnaseqOption();
+      document.querySelectorAll('input[name="chromatin_potential"]').forEach(r => r.onchange = toggleRnaseqOption);
+    }
+
+    function toggleRnaseqOption() {
+      document.getElementById('rnaseq_option').style.display = document.querySelector('input[name="chromatin_potential"][value="yes"]').checked ? 'block' : 'none';
+    }
+
+    // ===== STEP 2: SAMPLESHEET BUILDER =====
+    let currentMode = {};
+
+    function setupSamplesheetUI() {
+      const group = document.getElementById('exp_group').value;
+      const chromatin = document.querySelector('input[name="chromatin_potential"]:checked')?.value;
+      const otaCtrl = document.querySelector('input[name="ota_control"]:checked')?.value;
+      
+      // Clear previous
+      document.getElementById('exp_form').innerHTML = '';
+      document.getElementById('ctrl_form').innerHTML = '';
+      document.querySelector('#exp_table tbody').innerHTML = '';
+      document.querySelector('#ctrl_table tbody').innerHTML = '';
+      document.getElementById('exp_header').innerHTML = '';
+      document.getElementById('ctrl_header').innerHTML = '';
+      document.getElementById('samplesheetOutput').value = '';
+
+      // Define mode config
+      if (group === 'ata') {
+        if (chromatin === 'yes') {
+          currentMode = { header: 'sample,rna,dna,description', ctrlTitle: '🧬 RNA-seq Control Samples', showCtrl: true };
+          document.getElementById('samplesheet_ref').value = `sample,rna,dna,description\nHFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"\nHFFc6_imargi_2,SRR8206680_1.fastq.gz,SRR8206680_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"\nrnaseq_HFFc6,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6"`;
+          setupForm('exp', ['Sample', 'RNA FASTQ', 'DNA FASTQ', 'Description (e.g., tissue:"K562")']);
+          setupForm('ctrl', ['Sample (start with rnaseq_)', 'RNA FASTQ', 'DNA FASTQ', 'Description']);
+        } else {
+          currentMode = { header: 'sample,rna,dna', ctrlTitle: '', showCtrl: false };
+          document.getElementById('samplesheet_ref').value = `sample,rna,dna\nHFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz\nHFFc6_imargi_2,SRR8206680_1.fastq.gz,SRR8206680_2.fastq.gz`;
+          setupForm('exp', ['Sample', 'RNA FASTQ', 'DNA FASTQ']);
+          document.getElementById('ctrl_section').style.display = 'none';
+        }
+      } else { // OTA
+        if (otaCtrl === 'yes') {
+          currentMode = { header: 'sample,fastq_1,fastq_2,control,description', ctrlTitle: '🧪 Input Control Samples', showCtrl: true };
+          document.getElementById('samplesheet_ref').value = `sample,fastq_1,fastq_2,control,description\nSCIRT_chart_39,SRR10044362.fastq.gz,,SCIRT_INPUT,tissue:"K562"\nSCIRT_INPUT,SRR10044359.fastq.gz,,`;
+          setupForm('exp', ['Sample', 'FASTQ_1', 'FASTQ_2 (blank for SE)', 'Control Sample ID', 'Description']);
+          setupForm('ctrl', ['Sample ID', 'FASTQ_1', 'FASTQ_2', 'Description']);
+        } else {
+          currentMode = { header: 'sample,fastq_1,fastq_2,description', ctrlTitle: '', showCtrl: false };
+          document.getElementById('samplesheet_ref').value = `sample,fastq_1,fastq_2,description\nSCIRT_chart_39,SRR10044362.fastq.gz,,tissue:"K562"`;
+          setupForm('exp', ['Sample', 'FASTQ_1', 'FASTQ_2 (blank for SE)', 'Description']);
+          document.getElementById('ctrl_section').style.display = 'none';
+        }
+      }
+      
+      document.getElementById('ctrl_title').textContent = currentMode.ctrlTitle;
+      document.getElementById('ctrl_section').style.display = currentMode.showCtrl ? 'block' : 'none';
+      
+      // Set headers
+      setTableHeader('exp_header', currentMode.header.split(',').filter(h => !['control'].includes(h) && (currentMode.showCtrl || h !== 'control')));
+      if (currentMode.showCtrl) setTableHeader('ctrl_header', currentMode.header.split(',').filter(h => h !== 'control'));
+      
+      document.getElementById('samplesheet_hint').textContent = 
+        `Mode: ${group.toUpperCase()} | Header: ${currentMode.header} | No validation enforced. Leave blanks as needed.`;
+    }
+
+    function setupForm(prefix, labels) {
+      const container = document.getElementById(`${prefix}_form`);
+      labels.forEach((label, i) => {
+        const div = document.createElement('div');
+        div.innerHTML = `<input type="text" id="${prefix}_${i}" placeholder="${label}">`;
+        container.appendChild(div);
+      });
+    }
+
+    function setTableHeader(id, cols) {
+      const header = document.getElementById(id);
+      header.innerHTML = cols.map(c => `<th>${c}</th>`).join('') + '<th></th>';
+    }
+
+    function addRow(type) {
+      const cols = currentMode.header.split(',');
+      const filtered = type === 'ctrl' && currentMode.showCtrl 
+        ? cols.filter(c => c !== 'control') 
+        : (type === 'exp' ? cols : cols);
+        
+      const tbody = document.querySelector(`#${type}_table tbody`);
+      const row = document.createElement('tr');
+      let html = '';
+      
+      filtered.forEach((col, i) => {
+        const val = document.getElementById(`${type}_${i}`).value.trim();
+        html += `<td>${val}</td>`;
+      });
+      html += `<td><button class="remove-row" onclick="this.closest('tr').remove()">×</button></td>`;
+      row.innerHTML = html;
+      tbody.appendChild(row);
+      
+      // Clear inputs
+      filtered.forEach((_, i) => document.getElementById(`${type}_${i}`).value = '');
+    }
+
+    function clearAllRows() {
+      if(confirm('Clear all experimental and control rows?')) {
+        document.querySelector('#exp_table tbody').innerHTML = '';
+        if(currentMode.showCtrl) document.querySelector('#ctrl_table tbody').innerHTML = '';
+        document.getElementById('samplesheetOutput').value = '';
+      }
+    }
+
+    function generateSamplesheet() {
+      const cols = currentMode.header.split(',');
+      let csv = currentMode.header + '\n';
+      
+      const getTableData = (id) => Array.from(document.querySelectorAll(`#${id} tbody tr`)).map(row => 
+        Array.from(row.querySelectorAll('td')).slice(0, -1).map(cell => cell.textContent)
+      );
+
+      const expData = getTableData('exp_table');
+      const ctrlData = currentMode.showCtrl ? getTableData('ctrl_table') : [];
+
+      // Map experimental rows
+      expData.forEach(row => {
+        let mapped = [];
+        cols.forEach(col => {
+          const idx = cols.indexOf(col);
+          mapped.push(row[idx] || '');
+        });
+        csv += mapped.join(',') + '\n';
+      });
+
+      // Map control rows
+      if (currentMode.showCtrl && ctrlData.length > 0) {
+        ctrlData.forEach(row => {
+          let mapped = [];
+          cols.forEach(col => {
+            if (col === 'control') {
+              // For control rows, control column is usually blank or matches sample
+              mapped.push('');
+            } else {
+              const ctrlCols = cols.filter(c => c !== 'control');
+              const cIdx = ctrlCols.indexOf(col);
+              mapped.push(row[cIdx] || '');
+            }
+          });
+          csv += mapped.join(',') + '\n';
+        });
+      }
+
+      document.getElementById('samplesheetOutput').value = csv.trim();
+    }
+
+    function downloadSamplesheet() {
+      const csv = document.getElementById('samplesheetOutput').value;
+      if (!csv) return alert('Generate the samplesheet first.');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'samplesheet.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    // ===== STEP 3 & 4 (Unchanged logic, adapted for new flow) =====
+    function autoFillConfig() {
+      const method = document.getElementById('exp_method').value;
+      const group = document.getElementById('exp_group').value;
+      document.getElementById('config_exp_summary').textContent = `${group.toUpperCase()} / ${method.toUpperCase()}`;
+      document.getElementById('config_data_summary').textContent = document.querySelector('input[name="data_type"]:checked').value === 'pe' ? 'Paired-end' : 'Single-end';
+      document.getElementById('config_chromatin_summary').textContent = document.querySelector('input[name="chromatin_potential"]:checked')?.value === 'yes' ? 'Enabled' : 'Disabled';
+      document.getElementById('config_rnaseq_summary').textContent = (group === 'ata' && document.querySelector('input[name="include_rnaseq"]:checked')?.value === 'yes') || (group === 'ota' && document.querySelector('input[name="ota_control"]:checked')?.value === 'yes') ? 'Yes' : 'No';
+      
+      const bridgeMap = {
+        'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
+        'margi': { f: 'CCCTTT', r: 'AAAGGG' },
+        'grid': { f: 'AGCT', r: 'TCGA' },
+        'char': { f: 'ANNNACTG', r: 'CAGTNNNT' },
+        'radicl': { f: 'AGCT', r: 'TCGA' },
+        'chirp': { f: 'CUSTOM', r: 'CUSTOM' },
+        'rap': { f: 'CUSTOM', r: 'CUSTOM' }
+      };
+      if (bridgeMap[method]) {
+        document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
+        document.getElementById('config_bridge_rev').value = bridgeMap[method].r;
+      }
+    }
+
+    function toggleGenomeInput() {
+      document.getElementById('config_genome_name').style.display = document.getElementById('config_genome_mode').value === 'name' ? 'block' : 'none';
+      document.getElementById('config_genome_fasta').style.display = document.getElementById('config_genome_mode').value === 'fasta' ? 'block' : 'none';
+    }
+
+    function toggleAdvancedConfig() {
+      const adv = document.getElementById('advanced_config');
+      const btn = document.getElementById('toggleAdvBtn');
+      adv.style.display = adv.style.display === 'none' ? 'block' : 'none';
+      btn.textContent = adv.style.display === 'none' ? 'Show Advanced Options' : 'Hide Advanced Options';
+    }
+
+    function generateConfig() {
+      const method = document.getElementById('exp_method').value;
+      const genomeMode = document.getElementById('config_genome_mode').value;
+      const genomeVal = genomeMode === 'name' ? (document.getElementById('config_genome_name').value.trim() || 'GRCh38') : document.getElementById('config_genome_fasta').value.trim();
+      const annotBed = document.getElementById('config_annot_bed').value.trim();
+      const annotGtf = document.getElementById('config_annot_gtf').value.trim();
+      const showAdv = document.getElementById('advanced_config').style.display !== 'none';
+      const fwd = document.getElementById('config_bridge_fwd').value.trim() || 'AGCT';
+      const rev = document.getElementById('config_bridge_rev').value.trim() || 'TCGA';
+      
+      let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
+      cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\ndedup_tool = "fastuniq"\ntrim_tool = "fastp"\nalign_tool = 'hisat2'\nmerge_pairedend_tool = 'pear'\n`;
+      cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
+      cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
+      cfg += `bridge_processing = true\ndebridge_tool = "bitap"\nforward_bridge_seq = "${fwd}"\nreverse_bridge_seq = "${rev}"\n`;
+      cfg += `dna_part_processing = "*"\nrna_part_processing = "."\nmax_mismatches = 1\nmin_rna_dna_parts_length = 14\n`;
+      cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+      cfg += showAdv ? `max_memory = '${document.getElementById('config_max_memory').value}'\nmax_cpus = ${document.getElementById('config_max_cpus').value}\n` : `max_memory = '128.GB'\nmax_cpus = 16\n`;
+      cfg += `publish_dir_mode = 'copy'\n}\n\nprocess {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\nflags = [\n  fastq_dupaway: "--format fastq --compare-seq tight",\n  fastp: "-5 --correction --cut_window_size 5 --cut_mean_quality 26",\n  pear: "-p 0.01 -v 20 -n 50",\n  rna_align_options: "--no-softclip --dta-cufflinks -k 100",\n  dna_align_options: "--no-softclip -k 100 --no-spliced-alignment"\n]\n`;
+      document.getElementById('configOutput').value = cfg;
+    }
+
+    function downloadConfig() {
+      const cfg = document.getElementById('configOutput').value;
+      if (!cfg) return alert('Generate the config first.');
+      const blob = new Blob([cfg], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nextflow.config';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    function autoFillLaunchCommand() {
+      document.getElementById('launch_exp_type').value = document.getElementById('exp_method').value;
+    }
+
+    function generateLaunchCommand() {
+      const p = document.getElementById('launch_pipeline').value.trim() || '/path/to/nf-rnachrom';
+      const pr = document.getElementById('launch_profile').value;
+      const w = document.getElementById('launch_work').value.trim() || './work';
+      const o = document.getElementById('launch_outdir').value.trim() || './results';
+      const e = document.getElementById('exp_method').value;
+      document.getElementById('launchOutput').value = `nextflow run ${p} \\\n  -profile ${pr} \\\n  --input ./samplesheet.csv \\\n  -c ./nextflow.config \\\n  --exp_type ${e} \\\n  -w ${w} \\\n  --outdir ${o}`;
+    }
+
+    function downloadLaunchCommand() {
+      const cmd = document.getElementById('launchOutput').value;
+      if (!cmd || cmd.startsWith('//')) return alert('Generate the command first.');
+      const blob = new Blob([cmd], { type: 'text/plain' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'command.txt';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    function finishWizard() {
+      alert("✅ Setup complete!\n\nFiles ready for download:\n• samplesheet.csv\n• nextflow.config\n• command.txt\n\nRun the command in your terminal to start the pipeline.");
+    }
+
+    window.addEventListener('load', () => toggleGenomeInput());
+  </script>
+</body>
+</html>

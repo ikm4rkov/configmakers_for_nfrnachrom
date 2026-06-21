@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nextflow Config Generator - RNA-Chrom Pipeline</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; background: #f8f9fa; }
+    h1 { margin-bottom: 0.2rem; }
+    .card { background: #fff; padding: 1.2rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+    .section-title { font-weight: 600; margin: 1.2rem 0 0.6rem; padding-bottom: 0.3rem; border-bottom: 1px solid #eee; color: #333; }
+    label { display: block; margin: 0.6rem 0 0.3rem; font-weight: 500; }
+    .req::after { content: " *"; color: #d32f2f; }
+    .hint { font-size: 0.8rem; color: #666; margin-top: 0.2rem; font-style: italic; }
+    .warning { font-size: 0.8rem; color: #d32f2f; margin-top: 0.2rem; }
+    input, select { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    #advanced { display: none; }
+    .btn { background: #0066cc; color: #fff; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
+    .btn:hover { background: #005bb5; }
+    .btn-secondary { background: #6c757d; }
+    .btn-secondary:hover { background: #5a6268; }
+    .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.9rem; }
+    textarea { width: 100%; height: 150px; margin-top: 0.5rem; font-family: monospace; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; }
+    .note { font-size: 0.85rem; color: #666; margin-top: 0.5rem; }
+    .constants-note { font-size: 0.8rem; color: #888; font-style: italic; }
+    .editable-hint { font-size: 0.8rem; color: #0066cc; margin-top: 0.3rem; }
+    .bold-comment { font-weight: 600; color: #d32f2f; }
+    .default-badge { font-size: 0.75rem; background: #e3f2fd; color: #1976d2; padding: 0.1rem 0.4rem; border-radius: 3px; margin-left: 0.3rem; }
+    
+    /* Samplesheet table styles */
+    .samplesheet-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+    .samplesheet-table th, .samplesheet-table td { padding: 0.4rem; border: 1px solid #eee; text-align: left; }
+    .samplesheet-table th { background: #f8f9fa; font-weight: 500; }
+    .samplesheet-table input { width: 100%; padding: 0.3rem; border: 1px solid #ddd; border-radius: 3px; }
+    .remove-row { color: #d32f2f; cursor: pointer; font-weight: bold; background: none; border: none; font-size: 1.2rem; }
+    .remove-row:hover { color: #b71c1c; }
+    
+    /* Tab navigation */
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+    .tab-btn { padding: 0.5rem 1rem; background: none; border: none; cursor: pointer; font-weight: 500; color: #666; border-radius: 4px 4px 0 0; }
+    .tab-btn.active { background: #0066cc; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    /* Command box */
+    .command-box { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; font-family: monospace; white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Nextflow RNA-Chrom Pipeline Setup</h1>
+  <p>Generate config, samplesheet, and launch command in one place.</p>
+
+  <!-- Tab Navigation -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('config')">⚙️ Config Generator</button>
+    <button class="tab-btn" onclick="switchTab('samplesheet')">📋 Samplesheet Builder</button>
+    <button class="tab-btn" onclick="switchTab('launch')">🚀 Launch Command</button>
+  </div>
+
+  <!-- ===== CONFIG GENERATOR TAB ===== -->
+  <div id="config-tab" class="tab-content active">
+    <div class="card">
+      <h3>🔹 Required Parameters</h3>
+      
+      <label class="req">Experiment type</label>
+      <select id="exp_type">
+        <option value="">— Select experiment —</option>
+        <option value="grid">GRID-seq</option>
+        <option value="char">ChAR-seq</option>
+        <option value="redc">Red-C</option>
+        <option value="redchip">Red-ChIP</option>
+        <option value="margi">MARGI</option>
+      </select>
+      
+      <label class="req">Genome reference (name OR fasta path)</label>
+      <select id="genome_mode">
+        <option value="name">Use genome name (auto-download)</option>
+        <option value="fasta">Use custom FASTA file path</option>
+      </select>
+      <input type="text" id="genome_name" placeholder="e.g., GRCh38, mm10" style="margin-top:0.3rem;">
+      <input type="text" id="genome_fasta" placeholder="e.g., /path/to/genome.fa" style="display:none; margin-top:0.3rem;">
+      <p class="hint">💡 If FASTA path is provided, genome name download is skipped. Only ONE is required.</p>
+      
+      <!-- ✅ FIX 1: Two separate required fields for BED and GTF -->
+      <label class="req">Gene annotation BEDRC file</label>
+      <input type="text" id="annot_bed" placeholder="e.g., /data/genes/RNA_Chrom_genes_hg38.bedrc">
+      <p class="hint">💡 We use extended .bedrc format for RNA-Chrom analysis.</p>
+      
+      <label class="req">Gene annotation GTF file</label>
+      <input type="text" id="annot_gtf" placeholder="e.g., /data/genes/gencode.v35.annotation.gtf">
+      <p class="hint">💡 Both BEDRC and GTF files are required for full pipeline functionality.</p>
+    </div>
+
+    <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvanced()">Show Advanced Options</button>
+    
+    <div id="advanced" class="card">
+      <h3>⚙️ Advanced Parameters</h3>
+      
+      <!-- INPUT OPTIONS -->
+      <div class="section-title">Input Options</div>
+      <label>Split by chromosomes</label>
+      <select id="split_by_chromosomes">
+        <option value="false">false (default)</option>
+        <option value="true">true</option>
+      </select>
+
+      <!-- PROCESSING TOOLS -->
+      <div class="section-title">Processing Tools</div>
+      <label>Deduplication tool</label>
+      <select id="dedup_tool">
+        <option value="fastuniq">fastuniq (default)</option>
+        <option value="fastq-dupaway">fastq-dupaway</option>
+        <option value="clumpify">clumpify</option>
+      </select>
+      
+      <label>Trimming tool</label>
+      <select id="trim_tool">
+        <option value="fastp">fastp (default)</option>
+        <option value="trimmomatic">trimmomatic</option>
+        <option value="bbduk">bbduk</option>
+        <option value="cutadapt">cutadapt</option>
+      </select>
+      
+      <label>Alignment tool</label>
+      <select id="align_tool">
+        <option value="hisat2">hisat2 (default)</option>
+        <option value="bwa">bwa</option>
+        <option value="bowtie2">bowtie2</option>
+        <option value="star">star</option>
+      </select>
+      
+      <label>Paired-end merge tool</label>
+      <select id="merge_pairedend_tool">
+        <option value="pear">pear (default)</option>
+        <option value="bbmerge">bbmerge</option>
+      </select>
+
+      <!-- REFERENCE -->
+      <div class="section-title">Reference Paths</div>
+      <label>HISAT2 index path</label>
+      <input type="text" id="hisat2_index" placeholder="e.g., /ref/hg38/hisat2_index">
+      <p class="hint">💡 Tool will build index if not provided.</p>
+      
+      <label>Splice sites file (optional)</label>
+      <input type="text" id="splice_sites" placeholder="e.g., /ref/gencode.v43.ss">
+      <p class="hint">💡 Tool will generate if not provided.</p>
+
+      <!-- ANNOTATION -->
+      <div class="section-title">Annotation Extras</div>
+      <label>Blacklist BED file</label>
+      <input type="text" id="blacklist" placeholder="e.g., /ref/hg38.blacklist.bed">
+      
+      <label>Chromosome sizes file</label>
+      <input type="text" id="chromsizes" placeholder="e.g., /ref/hg38.chromsizes.tsv">
+      <p class="hint">💡 If empty, tool will calculate automatically.</p>
+      
+      <label>Detect strand genes list</label>
+      <input type="text" id="detect_strand_genes_list" value="${projectDir}/assets/gencode_v43_rpl_genes.txt" readonly>
+      <p class="warning">⚠️ Unadvised to change this value.</p>
+
+      <!-- BRIDGE SEARCH -->
+      <div class="section-title">Bridge Search</div>
+      <label>Enable bridge processing</label>
+      <select id="bridge_processing">
+        <option value="true">true (default)</option>
+        <option value="false">false</option>
+      </select>
+      
+      <label>De-bridge tool</label>
+      <select id="debridge_tool">
+        <option value="bitap">bitap (default, recommended)</option>
+        <option value="chartools">chartools (⚠️ not thoroughly tested)</option>
+      </select>
+      
+      <label>Forward bridge sequence</label>
+      <select id="forward_bridge_seq">
+        <option value="AGCT">AGCT (GRID-seq short)</option>
+        <option value="CCCTTT">CCCTTT (Red-C short)</option>
+        <option value="ANNNACTG">ANNNACTG (ChAR-seq with barcode)</option>
+        <option value="AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA">AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA <span class="default-badge">default for Red-C/Red-ChIP</span></option>
+        <option value="custom_forward">⚙️ Custom forward (edit manually in config)</option>
+      </select>
+      
+      <label>Reverse bridge sequence</label>
+      <select id="reverse_bridge_seq">
+        <option value="TCGA">TCGA (GRID-seq short)</option>
+        <option value="AAAGGG">AAAGGG (Red-C short)</option>
+        <option value="CAGTNNNT">CAGTNNNT (ChAR-seq complement)</option>
+        <option value="TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT">TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT <span class="default-badge">default for Red-C/Red-ChIP</span></option>
+        <option value="custom_reverse">⚙️ Custom reverse (edit manually in config)</option>
+      </select>
+      
+      <label>DNA part processing pattern</label>
+      <input type="text" id="dna_part_processing" value="*">
+      <p class="warning">⚠️ Must contain <code>*</code>. Unadvised to change.</p>
+      
+      <label>RNA part processing pattern</label>
+      <input type="text" id="rna_part_processing" value=".">
+      <p class="warning">⚠️ Must contain <code>.</code>. Unadvised to change.</p>
+      
+      <label>Max mismatches in bridge search</label>
+      <input type="number" id="max_mismatches" value="1" min="0" max="5">
+      
+      <label>Min RNA/DNA part length</label>
+      <input type="number" id="min_rna_dna_parts_length" value="14" min="10" max="50">
+      
+      <p class="hint" style="margin-top:0.8rem;">
+        🔹 <code>description_sequence</code> is auto-defined as:<br>
+        <code style="background:#f5f5f5;padding:0.2rem 0.4rem;border-radius:3px;display:block;margin:0.3rem 0;">
+          params.bridge_processing ? "${dna_part_processing}b${forward_bridge_seq}(${max_mismatches})${rna_part_processing}" : ""
+        </code>
+        This defines the read construction as <strong>5'-dna part-bridge-rna part-3'</strong>. 
+        <span class="warning">Highly unadvised to change — edit manually in config only if absolutely necessary.</span>
+      </p>
+
+      <!-- OTHER OPTIONS -->
+      <div class="section-title">Other Options</div>
+      <label>SmartSeq filter</label>
+      <select id="smartseq_filter">
+        <option value="true">true (default)</option>
+        <option value="false">false</option>
+      </select>
+      
+      <label>Adapters file path</label>
+      <input type="text" id="adapters_file" value="${projectDir}/assets/adapters_redc.fa">
+      
+      <label>Max memory per process</label>
+      <input type="text" id="max_memory" value="128.GB" placeholder="e.g., 64.GB">
+      
+      <label>Max CPUs per process</label>
+      <input type="number" id="max_cpus" value="16" min="1">
+      
+      <label>Max time per process</label>
+      <input type="text" id="max_time" value="240.h" placeholder="e.g., 48.h">
+      
+      <label>Publish directory mode</label>
+      <select id="publish_dir_mode">
+        <option value="copy">copy (default)</option>
+        <option value="link">link</option>
+        <option value="move">move</option>
+        <option value="rsync">rsync</option>
+      </select>
+
+      <!-- PROCESS CONFIG -->
+      <div class="section-title">Process Resource Overrides</div>
+      <p class="bold-comment">⚠️ These settings override the "Max resource options" above. Change both if needed.</p>
+      <label>Default CPUs for all processes</label>
+      <input type="number" id="process_cpus" value="2" min="1">
+      
+      <label>Default memory for all processes</label>
+      <input type="text" id="process_memory" value="10.GB" placeholder="e.g., 8.GB">
+
+      <!-- FLAGS -->
+      <div class="section-title">Tool Flags</div>
+      <label>fastq-dupaway flags</label>
+      <input type="text" id="flag_fastq_dupaway" value="--format fastq --compare-seq tight">
+      
+      <label>fastp adapter flags</label>
+      <input type="text" id="flag_fastp_adapters" value="-Q -l 1">
+      
+      <label>fastp general flags</label>
+      <input type="text" id="flag_fastp" value="-5 --correction --cut_window_size 5 --cut_mean_quality 26">
+      
+      <label>PEAR flags</label>
+      <input type="text" id="flag_pear" value="-p 0.01 -v 20 -n 50">
+      
+      <label>RNA alignment flags</label>
+      <input type="text" id="flag_rna_align" value="--no-softclip --dta-cufflinks -k 100">
+      <p class="hint">💡 These flags apply to ANY chosen alignment tool (hisat2/bwa/bowtie2/star).</p>
+      
+      <label>DNA alignment flags</label>
+      <input type="text" id="flag_dna_align" value="--no-softclip -k 100 --no-spliced-alignment">
+      <p class="hint">💡 These flags apply to ANY chosen alignment tool.</p>
+    </div>
+
+    <div style="margin-top: 1rem;">
+      <button class="btn" onclick="generateConfig()">Generate Config</button>
+      <button class="btn btn-secondary" onclick="downloadConfig()">Download nextflow.config</button>
+    </div>
+
+    <textarea id="configOutput" placeholder="Generated Nextflow config will appear here..."></textarea>
+    <p class="editable-hint">✏️ You can edit the config above manually. Clicking "Generate Config" will update it based on form values.</p>
+    
+    <p class="note">💡 CLI override example: <code>nextflow run main.nf --exp_type redc --genome_name GRCh38 --annot_bed /path/to/genes.bedrc</code></p>
+    <p class="constants-note">🔒 System constants and commented options are auto-included but hidden from editing. Override via CLI if needed.</p>
+  </div>
+
+  <!-- ===== SAMPLESHEET BUILDER TAB ===== -->
+  <div id="samplesheet-tab" class="tab-content">
+    <div class="card">
+      <h3>📋 Input Samplesheet Builder</h3>
+      <p class="hint">Generate a consistent CSV samplesheet for your Nextflow pipeline.</p>
+      
+      <label>Data type</label>
+      <select id="samplesheet_mode" onchange="updateSamplesheetColumns()">
+        <option value="pe">Paired-end data / Split DNA-RNA data (4 columns)</option>
+        <option value="se">Single-end data (3 columns)</option>
+        <option value="rnaseq_pe">Paired-end with RNA-seq linkage (4 columns + embedded link)</option>
+      </select>
+      
+      <div style="display:grid; grid-template-columns: 1fr 1.5fr 1.5fr 1fr auto; gap:0.5rem; align-items:end; margin:0.8rem 0;">
+        <div>
+          <label>Sample</label>
+          <input type="text" id="ss_sample" placeholder="e.g., HFFc6_imargi_1 or rnaseq_HFFc6">
+        </div>
+        <div>
+          <label>RNA FASTQ path</label>
+          <input type="text" id="ss_fastq1" placeholder="/data/sample_R1.fastq.gz">
+        </div>
+        <div id="ss_fastq2_col">
+          <label>DNA FASTQ path</label>
+          <input type="text" id="ss_fastq2" placeholder="/data/sample_R2.fastq.gz">
+        </div>
+        <div>
+          <label>Description</label>
+          <input type="text" id="ss_desc" placeholder='e.g., tissue:"HFFc6"'>
+        </div>
+        <div>
+          <button class="btn btn-sm" onclick="addSamplesheetRow()">+ Add</button>
+        </div>
+      </div>
+      
+      <!-- ✅ RNA-seq helper field (only shown in rnaseq_pe mode) -->
+      <div id="rnaseq_helper" style="display:none; margin:0.5rem 0; padding:0.5rem; background:#f0f7ff; border-radius:4px;">
+        <label style="margin:0;">RNA-seq link name (optional)</label>
+        <input type="text" id="ss_rnaseq_link" placeholder='e.g., rnaseq_HFFc6 — auto-appends rnaseq:"value" to description'>
+        <p class="hint" style="margin:0.2rem 0 0;">💡 Leave blank for RNA-seq reference rows (samples starting with <code>rnaseq_</code>). Fill for regular rows to link to their RNA-seq counterpart.</p>
+      </div>
+      
+      <!-- ✅ Example reference (readonly, shown only in rnaseq_pe mode) -->
+      <div id="rnaseq_example" style="display:none; margin:0.8rem 0;">
+        <label>📚 Example format (readonly reference):</label>
+        <textarea readonly style="height:100px;background:#f8f9fa;font-size:0.85rem;">sample,rna,dna,description
+HFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"
+HFFc6_imargi_2,SRR8206680_1.fastq.gz,SRR8206680_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"
+rnaseq_HFFc6,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6"</textarea>
+        <p class="hint">🔹 Regular rows: include <code>rnaseq:"&lt;name&gt;"</code> in description to link to RNA-seq<br>🔹 RNA-seq reference rows: sample name starts with <code>rnaseq_</code>, no <code>rnaseq:</code> in description</p>
+      </div>
+      
+      <table class="samplesheet-table" id="samplesheet_rows">
+        <thead>
+          <tr id="ss_header">
+            <th>Sample</th>
+            <th>RNA FASTQ</th>
+            <th>DNA FASTQ</th>
+            <th>Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      
+      <div style="margin-top:1rem;">
+        <button class="btn" onclick="generateSamplesheet()">Generate CSV</button>
+        <button class="btn btn-secondary" onclick="downloadSamplesheet()">Download samplesheet.csv</button>
+        <button class="btn btn-sm btn-secondary" onclick="clearSamplesheetRows()">Clear All</button>
+      </div>
+      
+      <textarea id="samplesheetOutput" placeholder="Generated CSV will appear here..."></textarea>
+      <p class="hint">💡 Nextflow expects: <code>--input /path/to/samplesheet.csv</code></p>
+    </div>
+  </div>
+
+  <!-- ===== LAUNCH COMMAND TAB ===== -->
+  <div id="launch-tab" class="tab-content">
+    <div class="card">
+      <h3>🚀 Pipeline Launch Command</h3>
+      <p class="hint">Build the exact command to run your pipeline.</p>
+      
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+        <div>
+          <label class="req">Pipeline path</label>
+          <input type="text" id="launch_pipeline" placeholder="/gpfs/user/nf-rnachrom/">
+          
+          <label class="req">Container profile</label>
+          <select id="launch_profile">
+            <option value="singularity">singularity (recommended)</option>
+            <option value="docker">docker</option>
+            <option value="conda">conda</option>
+            <option value="local">local (no container)</option>
+          </select>
+          
+          <label class="req">Config file path</label>
+          <input type="text" id="launch_config" placeholder="/path/to/your_config.groovy">
+          
+          <!-- ✅ FIX 3: New required input field for samplesheet path -->
+          <label class="req">Samplesheet path (--input)</label>
+          <input type="text" id="launch_input" placeholder="/path/to/samplesheet.csv">
+        </div>
+        <div>
+          <label class="req">Experiment type</label>
+          <select id="launch_exp_type">
+            <option value="">— Syncs with Config tab —</option>
+            <option value="grid">GRID-seq</option>
+            <option value="char">ChAR-seq</option>
+            <option value="redc">Red-C</option>
+            <option value="redchip">Red-ChIP</option>
+            <option value="margi">MARGI</option>
+          </select>
+          <p class="hint">💡 Auto-syncs when you change experiment type in Config tab</p>
+          
+          <label class="req">Work directory</label>
+          <input type="text" id="launch_work" placeholder="/path/to/work_dir">
+          
+          <label class="req">Output directory</label>
+          <input type="text" id="launch_outdir" placeholder="/path/to/results">
+        </div>
+      </div>
+      
+      <div style="margin-top:1rem;">
+        <button class="btn" onclick="generateLaunchCommand()">Generate Command</button>
+        <!-- ✅ FIX 3: Replaced copy button with download button -->
+        <button class="btn btn-secondary" onclick="downloadLaunchCommand()">💾 Download command.txt</button>
+      </div>
+      
+      <!-- ✅ FIX 3: Changed from div to editable textarea -->
+      <textarea id="launchOutput" placeholder="// Launch command will appear here..."></textarea>
+      <p class="hint">💡 Run this command in your terminal. All paths should be accessible to your compute environment. You can edit the command above before downloading.</p>
+    </div>
+  </div>
+
+  <script>
+    // ===== TAB SWITCHING =====
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      
+      document.querySelector(`.tab-btn:nth-child(${tabName==='config'?1:tabName==='samplesheet'?2:3})`).classList.add('active');
+      document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+
+    // ===== CONFIG GENERATOR FUNCTIONS =====
+    function toggleAdvanced() {
+      const adv = document.getElementById('advanced');
+      const btn = document.getElementById('toggleAdvBtn');
+      const isHidden = adv.style.display === 'none' || adv.style.display === '';
+      adv.style.display = isHidden ? 'block' : 'none';
+      btn.textContent = isHidden ? 'Hide Advanced Options' : 'Show Advanced Options';
+    }
+
+    document.getElementById('genome_mode').addEventListener('change', function() {
+      document.getElementById('genome_name').style.display = this.value === 'name' ? 'block' : 'none';
+      document.getElementById('genome_fasta').style.display = this.value === 'fasta' ? 'block' : 'none';
+    });
+
+    // Sync exp_type between config and launch tabs
+    document.getElementById('exp_type').addEventListener('change', function() {
+      document.getElementById('launch_exp_type').value = this.value;
+    });
+    document.getElementById('launch_exp_type').addEventListener('change', function() {
+      document.getElementById('exp_type').value = this.value;
+    });
+
+    document.getElementById('exp_type').addEventListener('change', function() {
+      const exp = this.value;
+      const forward = document.getElementById('forward_bridge_seq');
+      const reverse = document.getElementById('reverse_bridge_seq');
+      
+      const bridgeMap = {
+        'grid': { f: 'AGCT', r: 'TCGA' },
+        'char': { f: 'ANNNACTG', r: 'CAGTNNNT' },
+        'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
+        'redchip': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
+        'margi': { f: 'CCCTTT', r: 'AAAGGG' }
+      };
+      
+      if (bridgeMap[exp]) {
+        forward.value = bridgeMap[exp].f;
+        reverse.value = bridgeMap[exp].r;
+      }
+    });
+
+    function quoteIfNeeded(val) {
+      if (!val) return "null";
+      const num = Number(val);
+      if (!isNaN(num) && isFinite(num)) return String(num);
+      if (val.toLowerCase().match(/^\d+\.?(gb|mb|kb|tb|h)$/)) return val;
+      if (val.startsWith('${') && val.endsWith('}')) return val;
+      return `'${val.replace(/'/g, "\\'")}'`;
+    }
+
+    function generateConfig() {
+      const expType = document.getElementById('exp_type').value.trim();
+      const genomeMode = document.getElementById('genome_mode').value;
+      const genomeVal = genomeMode === 'name' 
+        ? document.getElementById('genome_name').value.trim()
+        : document.getElementById('genome_fasta').value.trim();
+      // ✅ FIX 1: Get both BED and GTF values (both required)
+      const annotBed = document.getElementById('annot_bed').value.trim();
+      const annotGtf = document.getElementById('annot_gtf').value.trim();
+
+      if (!expType || !genomeVal || !annotBed || !annotGtf) {
+        alert("Please fill all required fields marked with *");
+        return;
+      }
+
+      let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\n`;
+      cfg += `includeConfig "\${projectDir}/conf/base.config"\n`;
+      cfg += `includeConfig "\${projectDir}/conf/modules.config"\n\n`;
+      cfg += `params {\n`;
+      
+      cfg += `// INPUT OPTIONS:\n`;
+      cfg += `// input = null\n`;
+      cfg += `exp_type = '${expType}'\n`;
+      cfg += `procedure = 'old'\n`;
+      cfg += `// mode = 'explorer'\n`;
+      cfg += `// xrna_assembly = true\n`;
+      
+      const showAdv = document.getElementById('advanced').style.display === 'block';
+      if (showAdv) {
+        cfg += `split_by_chromosomes = ${document.getElementById('split_by_chromosomes').value}\n`;
+      } else {
+        cfg += `split_by_chromosomes = false\n`;
+      }
+      
+      cfg += `// PROCESSING TOOLS: --------------------------------------------------------------------------------\n`;
+      if (showAdv) {
+        cfg += `dedup_tool = "${document.getElementById('dedup_tool').value}" // options: "fastq-dupaway", "fastuniq", "clumpify"\n`;
+        cfg += `trim_tool = "${document.getElementById('trim_tool').value}" // options: "trimmomatic", "bbduk", "cutadapt", "fastp"\n`;
+        cfg += `align_tool = '${document.getElementById('align_tool').value}'\n`;
+        cfg += `merge_pairedend_tool = '${document.getElementById('merge_pairedend_tool').value}' // options: "bbmerge", "pear"\n`;
+      } else {
+        cfg += `dedup_tool = "fastuniq" // options: "fastq-dupaway", "fastuniq", "clumpify"\n`;
+        cfg += `trim_tool = "fastp" // options: "trimmomatic", "bbduk", "cutadapt", "fastp"\n`;
+        cfg += `align_tool = 'hisat2'\n`;
+        cfg += `merge_pairedend_tool = 'pear' // options: "bbmerge", "pear"\n`;
+      }
+
+      cfg += `\n// REFERENCE: --------------------------------------------------------------------------------\n`;
+      if (genomeMode === 'name') {
+        cfg += `genome = '${genomeVal}'\n`;
+        cfg += `// genome_fasta = null  // skipped: using genome name\n`;
+      } else {
+        cfg += `// genome = 'GRCh38'  // skipped: using custom FASTA\n`;
+        cfg += `genome_fasta = '${genomeVal}'\n`;
+      }
+      
+      if (showAdv) {
+        cfg += `hisat2_index = '${document.getElementById('hisat2_index').value || ''}'  // tool builds if empty\n`;
+        const spliceVal = document.getElementById('splice_sites').value.trim();
+        cfg += spliceVal ? `splice_sites = '${spliceVal}'\n` : `// splice_sites = '/path/to/file.ss'  // tool generates if not stated\n`;
+      } else {
+        cfg += `hisat2_index = '/gpfs/ryabykhgrigory/run_nextflow_rnachrom/reference/hs/hg38'  // default\n`;
+        cfg += `// splice_sites = '/gpfs/ilnitsky/nf-rnachrom/reference/hs/gencode.asig.v43.ss'\n`;
+      }
+      cfg += `stages = 'annotation, splicing, normalize, peak_calling'\n`;
+
+      // ✅ FIX 1: Both annot_BED and annot_GTF are now required and always included
+      cfg += `\n// ANNOTATION: --------------------------------------------------------------------------------\n`;
+      cfg += `annot_BED = "${annotBed}"  // extended .bedrc format\n`;
+      cfg += `annot_GTF = '${annotGtf}'\n`;
+      
+      if (showAdv) {
+        const blVal = document.getElementById('blacklist').value.trim();
+        cfg += blVal ? `blacklist = '${blVal}'\n` : `// blacklist = '/ref/hg38.blacklist.bed'\n`;
+        const csVal = document.getElementById('chromsizes').value.trim();
+        cfg += csVal ? `chromsizes = "${csVal}"\n` : `// chromsizes = "/ref/hg38.chromsizes.tsv"  // tool calculates if empty\n`;
+        const genesVal = document.getElementById('detect_strand_genes_list').value.trim();
+        cfg += `detect_strand_genes_list = "${genesVal}"  // ⚠️ unadvised to change\n`;
+      } else {
+        cfg += `// blacklist = '/gpfs/ryabykhgrigory/run_nextflow_rnachrom/reference/hs/hg38.blacklist.bed'\n`;
+        cfg += `// chromsizes = "/gpfs/ryabykhgrigory/run_nextflow_rnachrom/reference/hs/hg38_canonical_chromsizes.tsv"\n`;
+        cfg += `detect_strand_genes_list = "\${projectDir}/assets/gencode_v43_rpl_genes.txt"\n`;
+      }
+
+      cfg += `\n// BRIDGE SEARCH: --------------------------------------------------------------------------------\n`;
+      if (showAdv) {
+        cfg += `bridge_processing = ${document.getElementById('bridge_processing').value}\n`;
+        cfg += `debridge_tool = "${document.getElementById('debridge_tool').value}" // options: "bitap", "chartools" (chartools not thoroughly tested)\n`;
+        const fwdVal = document.getElementById('forward_bridge_seq').value;
+        const revVal = document.getElementById('reverse_bridge_seq').value;
+        cfg += fwdVal.startsWith('custom') ? `// forward_bridge_seq = "CUSTOM"\n` : `forward_bridge_seq = "${fwdVal}"\n`;
+        cfg += revVal.startsWith('custom') ? `// reverse_bridge_seq = "CUSTOM"\n` : `reverse_bridge_seq = "${revVal}"\n`;
+        cfg += `dna_part_processing = "${document.getElementById('dna_part_processing').value}"  // ⚠️ must contain *\n`;
+        cfg += `rna_part_processing = "${document.getElementById('rna_part_processing').value}"  // ⚠️ must contain .\n`;
+        cfg += `max_mismatches = ${document.getElementById('max_mismatches').value}\n`;
+        cfg += `min_rna_dna_parts_length = ${document.getElementById('min_rna_dna_parts_length').value}\n`;
+        cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""  // 5'-dna-bridge-rna-3'\n`;
+      } else {
+        cfg += `bridge_processing = true\n`;
+        cfg += `debridge_tool = "bitap"\n`;
+        cfg += `forward_bridge_seq = "AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA"\n`;
+        cfg += `reverse_bridge_seq = "TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT"\n`;
+        cfg += `dna_part_processing = "*"\n`;
+        cfg += `rna_part_processing = "."\n`;
+        cfg += `max_mismatches = 1\n`;
+        cfg += `min_rna_dna_parts_length = 14\n`;
+        cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""  // 5'-dna-bridge-rna-3'\n`;
+      }
+
+      cfg += `\n// OTHER OPTIONS --------------------------------------------------------------------------------\n`;
+      if (showAdv) {
+        cfg += `smartseq_filter = ${document.getElementById('smartseq_filter').value}\n`;
+        cfg += `adapters_file = "${document.getElementById('adapters_file').value}"\n`;
+        cfg += `// disable_adapter_autodetect = true\n`;
+        cfg += `max_memory = '${document.getElementById('max_memory').value}'\n`;
+        cfg += `max_cpus = ${document.getElementById('max_cpus').value}\n`;
+        cfg += `max_time = '${document.getElementById('max_time').value}'\n`;
+        cfg += `// outdir = null\n`;
+        cfg += `publish_dir_mode = '${document.getElementById('publish_dir_mode').value}'\n`;
+        cfg += `// email = null\n// help = false\n// version = false\n`;
+      } else {
+        cfg += `smartseq_filter = true\n`;
+        cfg += `adapters_file = "\${projectDir}/assets/adapters_redc.fa"\n`;
+        cfg += `// disable_adapter_autodetect = true\n`;
+        cfg += `max_memory = '128.GB'\n`;
+        cfg += `max_cpus = 16\n`;
+        cfg += `max_time = '240.h'\n`;
+        cfg += `// outdir = null\n`;
+        cfg += `publish_dir_mode = 'copy'\n`;
+        cfg += `// email = null\n// help = false\n// version = false\n`;
+      }
+
+      cfg += `// --------------------------------------------------------------------------------\n`;
+      cfg += `// BARDIC OPTIONS --------------------------------------------------------------------------------\n\n`;
+      cfg += `}\n\n`;
+
+      if (showAdv) {
+        cfg += `process {\nwithName: '.*' {\n`;
+        cfg += `  // <b>⚠️ This overwrites default max resource options</b>\n`;
+        cfg += `  cpus = ${document.getElementById('process_cpus').value}\n`;
+        cfg += `  memory = ${document.getElementById('process_memory').value}\n`;
+        cfg += `}\n}\n\n`;
+      } else {
+        cfg += `process {\nwithName: '.*' {\n`;
+        cfg += `  // <b>⚠️ This overwrites default max resource options</b>\n`;
+        cfg += `  cpus = 2\n  memory = 10.GB\n}\n}\n\n`;
+      }
+
+      cfg += `flags = [\n`;
+      if (showAdv) {
+        cfg += `  fastq_dupaway: "${document.getElementById('flag_fastq_dupaway').value}",\n`;
+        cfg += `  fastp_adapters: "${document.getElementById('flag_fastp_adapters').value}",\n`;
+        cfg += `  fastp: "${document.getElementById('flag_fastp').value}",\n`;
+        cfg += `  pear: "${document.getElementById('flag_pear').value}",\n`;
+        cfg += `  // 💡 alignment flags apply to ANY chosen tool\n`;
+        cfg += `  rna_align_options: "${document.getElementById('flag_rna_align').value}",\n`;
+        cfg += `  dna_align_options: "${document.getElementById('flag_dna_align').value}",\n`;
+      } else {
+        cfg += `  fastq_dupaway: "--format fastq --compare-seq tight",\n`;
+        cfg += `  fastp_adapters: "-Q -l 1",\n`;
+        cfg += `  fastp: "-5 --correction --cut_window_size 5 --cut_mean_quality 26",\n`;
+        cfg += `  pear: "-p 0.01 -v 20 -n 50",\n`;
+        cfg += `  // 💡 alignment flags apply to ANY chosen tool\n`;
+        cfg += `  rna_align_options: "--no-softclip --dta-cufflinks -k 100",\n`;
+        cfg += `  dna_align_options: "--no-softclip -k 100 --no-spliced-alignment",\n`;
+      }
+      cfg += `]\n`;
+
+      document.getElementById('configOutput').value = cfg;
+    }
+
+    function downloadConfig() {
+      const cfg = document.getElementById('configOutput').value;
+      if (!cfg) { alert("Generate the config first."); return; }
+      const blob = new Blob([cfg], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'nextflow.config';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // ===== SAMPLESHEET FUNCTIONS =====
+    function updateSamplesheetColumns() {
+      const mode = document.getElementById('samplesheet_mode').value;
+      const fastq2Col = document.getElementById('ss_fastq2_col');
+      const rnaseqHelper = document.getElementById('rnaseq_helper');
+      const rnaseqExample = document.getElementById('rnaseq_example');
+      const header = document.getElementById('ss_header');
+      
+      // Reset all optional elements
+      fastq2Col.style.display = 'none';
+      rnaseqHelper.style.display = 'none';
+      rnaseqExample.style.display = 'none';
+      header.children[2].style.display = 'none'; // DNA FASTQ header
+      
+      // Update header labels based on mode
+      header.children[1].textContent = mode === 'rnaseq_pe' ? 'RNA FASTQ' : 'Fastq_1';
+      header.children[2].textContent = mode === 'rnaseq_pe' ? 'DNA FASTQ' : 'Fastq_2';
+      
+      if (mode === 'pe' || mode === 'rnaseq_pe') {
+        fastq2Col.style.display = 'block';
+        header.children[2].style.display = 'table-cell';
+      }
+      
+      // ✅ Show RNA-seq helper and example only in rnaseq_pe mode
+      if (mode === 'rnaseq_pe') {
+        rnaseqHelper.style.display = 'block';
+        rnaseqExample.style.display = 'block';
+      }
+    }
+
+    function addSamplesheetRow() {
+      const sample = document.getElementById('ss_sample').value.trim();
+      const fastq1 = document.getElementById('ss_fastq1').value.trim();
+      const fastq2 = document.getElementById('ss_fastq2').value.trim();
+      let desc = document.getElementById('ss_desc').value.trim();
+      const mode = document.getElementById('samplesheet_mode').value;
+      
+      // ✅ RNA-seq link helper: append to description if provided
+      if (mode === 'rnaseq_pe') {
+        const rnaseqLink = document.getElementById('ss_rnaseq_link').value.trim();
+        if (rnaseqLink) {
+          // Append rnaseq:"value" to description, handling existing content
+          const rnaseqPart = `rnaseq:"${rnaseqLink}"`;
+          desc = desc ? `${desc};${rnaseqPart}` : rnaseqPart;
+        }
+      }
+
+      if (!sample || !fastq1) {
+        alert("Sample and RNA FASTQ path are required fields");
+        return;
+      }
+      if ((mode === 'pe' || mode === 'rnaseq_pe') && !fastq2) {
+        alert("DNA FASTQ path is required for paired-end modes");
+        return;
+      }
+
+      const tbody = document.querySelector('#samplesheet_rows tbody');
+      const row = document.createElement('tr');
+      
+      row.innerHTML = `
+        <td>${sample}</td>
+        <td>${fastq1}</td>
+        <td>${mode === 'se' ? '' : fastq2}</td>
+        <td>${desc}</td>
+        <td><button class="remove-row" onclick="this.closest('tr').remove()">×</button></td>
+      `;
+      
+      tbody.appendChild(row);
+      
+      // Clear inputs
+      document.getElementById('ss_sample').value = '';
+      document.getElementById('ss_fastq1').value = '';
+      document.getElementById('ss_fastq2').value = '';
+      document.getElementById('ss_desc').value = '';
+      if (mode === 'rnaseq_pe') {
+        document.getElementById('ss_rnaseq_link').value = '';
+      }
+    }
+
+    function clearSamplesheetRows() {
+      if (confirm('Clear all samplesheet rows?')) {
+        document.querySelector('#samplesheet_rows tbody').innerHTML = '';
+        document.getElementById('samplesheetOutput').value = '';
+      }
+    }
+
+    function generateSamplesheet() {
+      const mode = document.getElementById('samplesheet_mode').value;
+      const rows = document.querySelectorAll('#samplesheet_rows tbody tr');
+      
+      if (rows.length === 0) {
+        alert("Add at least one sample row first");
+        return;
+      }
+
+      // ✅ CSV header based on mode (4 columns for rnaseq_pe, matching example)
+      if (mode === 'rnaseq_pe') {
+        var csv = 'sample,rna,dna,description\n';
+      } else if (mode === 'pe') {
+        var csv = 'sample,fastq_1,fastq_2,description\n';
+      } else {
+        var csv = 'sample,fastq_1,description\n';
+      }
+      
+      // Data rows
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const sample = cells[0].textContent;
+        const fastq1 = cells[1].textContent;
+        const fastq2 = cells[2].textContent;
+        const desc = cells[3].textContent;
+        
+        if (mode === 'rnaseq_pe') {
+          // ✅ 4-column format with embedded rnaseq link in description
+          csv += `${sample},${fastq1},${fastq2},${desc}\n`;
+        } else if (mode === 'pe') {
+          csv += `${sample},${fastq1},${fastq2},${desc}\n`;
+        } else {
+          csv += `${sample},${fastq1},${desc}\n`;
+        }
+      });
+      
+      document.getElementById('samplesheetOutput').value = csv;
+    }
+
+    function downloadSamplesheet() {
+      const csv = document.getElementById('samplesheetOutput').value;
+      if (!csv) { alert("Generate the samplesheet first."); return; }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'samplesheet.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // ===== LAUNCH COMMAND FUNCTIONS =====
+    function generateLaunchCommand() {
+      const pipeline = document.getElementById('launch_pipeline').value.trim();
+      const profile = document.getElementById('launch_profile').value;
+      const config = document.getElementById('launch_config').value.trim();
+      // ✅ FIX 3: Get the new samplesheet input field
+      const inputPath = document.getElementById('launch_input').value.trim();
+      const expType = document.getElementById('launch_exp_type').value.trim();
+      const work = document.getElementById('launch_work').value.trim();
+      const outdir = document.getElementById('launch_outdir').value.trim();
+
+      if (!pipeline || !profile || !config || !inputPath || !expType || !work || !outdir) {
+        alert("Please fill all required fields for the launch command");
+        return;
+      }
+
+      // Build command with line breaks for readability
+      let cmd = `nextflow run ${pipeline} \\\n`;
+      cmd += `  -profile ${profile} \\\n`;
+      cmd += `  --input ${inputPath} \\\n`;  // ✅ FIX 3: Use actual input path
+      cmd += `  -c ${config} \\\n`;
+      cmd += `  --exp_type ${expType} \\\n`;
+      cmd += `  -w ${work} \\\n`;
+      cmd += `  --outdir ${outdir}`;
+      
+      // ✅ FIX 3: Set editable textarea value
+      document.getElementById('launchOutput').value = cmd;
+    }
+
+    // ✅ FIX 3: New function to download command as text file
+    function downloadLaunchCommand() {
+      const cmd = document.getElementById('launchOutput').value;
+      if (!cmd || cmd.startsWith('//')) { alert("Generate the command first."); return; }
+      const blob = new Blob([cmd], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'command.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Initialize on load
+    window.addEventListener('load', function() {
+      document.getElementById('genome_mode').value = 'name';
+      document.getElementById('samplesheet_mode').value = 'pe';
+      document.getElementById('genome_name').style.display = 'block';
+      updateSamplesheetColumns();
+    });
+  </script>
+</body>
+</html>
