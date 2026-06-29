@@ -207,6 +207,17 @@
     <label>Annotation GTF file</label>
     <input type="text" id="config_annot_gtf" placeholder="/data/genes/gencode.v35.annotation.gtf">
     
+    <!-- ✅ NEW: Mapper Choice (Required) -->
+    <label class="req">Mapper Choice</label>
+    <select id="config_mapper" onchange="updateMapperOptions()">
+      <option value="hisat2">hisat2</option>
+      <option value="bwa_mem">bwa mem</option>
+      <option value="bwa_aln">bwa aln</option>
+      <option value="bowtie2">bowtie2</option>
+      <option value="star">star</option>
+    </select>
+    <p class="hint">💡 Determines alignment engine. RNA/DNA flag defaults will auto-update.</p>
+    
     <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvancedConfig()" style="margin:0.5rem 0;">Show Advanced Options</button>
     
     <div id="advanced_config" style="display:none;">
@@ -215,6 +226,14 @@
       
       <label>Reverse bridge sequence</label>
       <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence">
+      
+      <!-- ✅ NEW: RNA/DNA Mapper Options -->
+      <label>RNA Alignment Options <span class="default-badge">mapper-dependent</span></label>
+      <input type="text" id="config_rna_align_opts" value="--no-softclip --dta-cufflinks -k 100">
+      
+      <label>DNA Alignment Options <span class="default-badge">mapper-dependent</span></label>
+      <input type="text" id="config_dna_align_opts" value="--no-softclip -k 100 --no-spliced-alignment">
+      <p class="hint">💡 These flags apply to the chosen mapper. Edit to override defaults.</p>
       
       <label>Max memory per process</label>
       <input type="text" id="config_max_memory" value="128.GB">
@@ -338,7 +357,6 @@
       const chromatin = document.querySelector('input[name="chromatin_potential"]:checked')?.value;
       const otaCtrl = document.querySelector('input[name="ota_control"]:checked')?.value;
       
-      // Clear previous
       document.getElementById('exp_form').innerHTML = '';
       document.getElementById('ctrl_form').innerHTML = '';
       document.querySelector('#exp_table tbody').innerHTML = '';
@@ -347,7 +365,6 @@
       document.getElementById('ctrl_header').innerHTML = '';
       document.getElementById('samplesheetOutput').value = '';
 
-      // Define mode config
       if (group === 'ata') {
         if (chromatin === 'yes') {
           currentMode = { header: 'sample,rna,dna,description', ctrlTitle: '🧬 RNA-seq Control Samples', showCtrl: true };
@@ -377,7 +394,6 @@
       document.getElementById('ctrl_title').textContent = currentMode.ctrlTitle;
       document.getElementById('ctrl_section').style.display = currentMode.showCtrl ? 'block' : 'none';
       
-      // Set headers
       setTableHeader('exp_header', currentMode.header.split(',').filter(h => !['control'].includes(h) && (currentMode.showCtrl || h !== 'control')));
       if (currentMode.showCtrl) setTableHeader('ctrl_header', currentMode.header.split(',').filter(h => h !== 'control'));
       
@@ -417,7 +433,6 @@
       row.innerHTML = html;
       tbody.appendChild(row);
       
-      // Clear inputs
       filtered.forEach((_, i) => document.getElementById(`${type}_${i}`).value = '');
     }
 
@@ -440,7 +455,6 @@
       const expData = getTableData('exp_table');
       const ctrlData = currentMode.showCtrl ? getTableData('ctrl_table') : [];
 
-      // Map experimental rows
       expData.forEach(row => {
         let mapped = [];
         cols.forEach(col => {
@@ -450,15 +464,12 @@
         csv += mapped.join(',') + '\n';
       });
 
-      // Map control rows
       if (currentMode.showCtrl && ctrlData.length > 0) {
         ctrlData.forEach(row => {
           let mapped = [];
           cols.forEach(col => {
-            if (col === 'control') {
-              // For control rows, control column is usually blank or matches sample
-              mapped.push('');
-            } else {
+            if (col === 'control') mapped.push('');
+            else {
               const ctrlCols = cols.filter(c => c !== 'control');
               const cIdx = ctrlCols.indexOf(col);
               mapped.push(row[cIdx] || '');
@@ -479,7 +490,39 @@
       document.body.appendChild(a); a.click(); a.remove();
     }
 
-    // ===== STEP 3 & 4 (Unchanged logic, adapted for new flow) =====
+    // ===== STEP 3 & 4: CONFIG & LAUNCH =====
+    
+    // ✅ NEW: Mapper defaults mapping
+    const mapperDefaults = {
+      hisat2: {
+        rna: '--no-softclip --dta-cufflinks -k 100',
+        dna: '--no-softclip -k 100 --no-spliced-alignment'
+      },
+      bwa_mem: {
+        rna: '-M -t 4 -Y',
+        dna: '-M -t 4 -Y'
+      },
+      bwa_aln: {
+        rna: '-n 0.04 -l 32 -t 4',
+        dna: '-n 0.04 -l 32 -t 4'
+      },
+      bowtie2: {
+        rna: '--very-sensitive --no-unal -p 4',
+        dna: '--very-sensitive --no-unal -p 4'
+      },
+      star: {
+        rna: '--outFilterMultimapNmax 100 --alignSJoverhangMin 8 --runThreadN 4',
+        dna: '--alignEndsType EndToEnd --chimSegmentMin 15 --runThreadN 4'
+      }
+    };
+
+    function updateMapperOptions() {
+      const mapper = document.getElementById('config_mapper').value;
+      const defaults = mapperDefaults[mapper] || mapperDefaults.hisat2;
+      document.getElementById('config_rna_align_opts').value = defaults.rna;
+      document.getElementById('config_dna_align_opts').value = defaults.dna;
+    }
+
     function autoFillConfig() {
       const method = document.getElementById('exp_method').value;
       const group = document.getElementById('exp_group').value;
@@ -501,6 +544,9 @@
         document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
         document.getElementById('config_bridge_rev').value = bridgeMap[method].r;
       }
+      
+      // ✅ Initialize mapper options
+      updateMapperOptions();
     }
 
     function toggleGenomeInput() {
@@ -524,16 +570,21 @@
       const showAdv = document.getElementById('advanced_config').style.display !== 'none';
       const fwd = document.getElementById('config_bridge_fwd').value.trim() || 'AGCT';
       const rev = document.getElementById('config_bridge_rev').value.trim() || 'TCGA';
+      const mapper = document.getElementById('config_mapper').value;
+      
+      // ✅ NEW: Read RNA/DNA mapper options
+      const rnaOpts = document.getElementById('config_rna_align_opts').value.trim();
+      const dnaOpts = document.getElementById('config_dna_align_opts').value.trim();
       
       let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
-      cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\ndedup_tool = "fastuniq"\ntrim_tool = "fastp"\nalign_tool = 'hisat2'\nmerge_pairedend_tool = 'pear'\n`;
+      cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\ndedup_tool = "fastuniq"\ntrim_tool = "fastp"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = 'pear'\n`;
       cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
       cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       cfg += `bridge_processing = true\ndebridge_tool = "bitap"\nforward_bridge_seq = "${fwd}"\nreverse_bridge_seq = "${rev}"\n`;
       cfg += `dna_part_processing = "*"\nrna_part_processing = "."\nmax_mismatches = 1\nmin_rna_dna_parts_length = 14\n`;
       cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
       cfg += showAdv ? `max_memory = '${document.getElementById('config_max_memory').value}'\nmax_cpus = ${document.getElementById('config_max_cpus').value}\n` : `max_memory = '128.GB'\nmax_cpus = 16\n`;
-      cfg += `publish_dir_mode = 'copy'\n}\n\nprocess {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\nflags = [\n  fastq_dupaway: "--format fastq --compare-seq tight",\n  fastp: "-5 --correction --cut_window_size 5 --cut_mean_quality 26",\n  pear: "-p 0.01 -v 20 -n 50",\n  rna_align_options: "--no-softclip --dta-cufflinks -k 100",\n  dna_align_options: "--no-softclip -k 100 --no-spliced-alignment"\n]\n`;
+      cfg += `publish_dir_mode = 'copy'\n}\n\nprocess {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\nflags = [\n  fastq_dupaway: "--format fastq --compare-seq tight",\n  fastp: "-5 --correction --cut_window_size 5 --cut_mean_quality 26",\n  pear: "-p 0.01 -v 20 -n 50",\n  rna_align_options: "${rnaOpts}",\n  dna_align_options: "${dnaOpts}"\n]\n`;
       document.getElementById('configOutput').value = cfg;
     }
 
