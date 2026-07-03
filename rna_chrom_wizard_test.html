@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Nextflow RNA-Chrom Pipeline Wizard</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 850px; margin: 2rem auto; padding: 0 1rem; background: #f8f9fa; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; background: #f8f9fa; }
     h1 { margin-bottom: 0.2rem; }
     .wizard-step { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 1rem; display: none; }
     .wizard-step.active { display: block; }
@@ -25,7 +25,7 @@
     .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.9rem; }
     .btn-success { background: #28a745; }
     .btn-success:hover { background: #218838; }
-    textarea { width: 100%; height: 180px; margin-top: 0.5rem; font-family: monospace; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fa; }
+    textarea { width: 100%; height: 200px; margin-top: 0.5rem; font-family: monospace; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fa; }
     .samplesheet-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
     .samplesheet-table th, .samplesheet-table td { padding: 0.4rem; border: 1px solid #eee; text-align: left; }
     .samplesheet-table th { background: #f8f9fa; font-weight: 500; }
@@ -42,6 +42,7 @@
     .sample-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; align-items: end; margin: 0.8rem 0; padding: 0.8rem; background: #f8f9fa; border-radius: 4px; }
     .section-divider { border-top: 2px dashed #dee2e6; margin: 1.5rem 0; }
     .ref-box { font-size: 0.82rem; line-height: 1.4; }
+    .bridge-preview { background: #f0f7ff; padding: 0.8rem; border-radius: 4px; margin: 0.5rem 0; font-family: monospace; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -87,11 +88,11 @@
       <p class="hint">💡 Enables RNA-seq integration for chromatin state analysis.</p>
       
       <label>Split RNA-DNA Parts (pre-processed data)</label>
-      <div class="radio-group">
+      <div class="radio-group" id="split_container">
         <label><input type="radio" name="split_rna_dna" value="yes"> Yes</label>
         <label><input type="radio" name="split_rna_dna" value="no" checked> No</label>
       </div>
-      <p class="hint">💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.</p>
+      <p class="hint" id="split_hint">💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.</p>
       
       <div id="rnaseq_option" class="conditional-field" style="display:none;">
         <label>Include RNA-seq samples in samplesheet</label>
@@ -207,7 +208,7 @@
     <label>Annotation GTF file</label>
     <input type="text" id="config_annot_gtf" placeholder="/data/genes/gencode.v35.annotation.gtf">
     
-    <!-- ✅ NEW: Mapper Choice (Required) -->
+    <!-- ✅ Mapper Choice (Required) -->
     <label class="req">Mapper Choice</label>
     <select id="config_mapper" onchange="updateMapperOptions()">
       <option value="hisat2">hisat2</option>
@@ -216,18 +217,42 @@
       <option value="bowtie2">bowtie2</option>
       <option value="star">star</option>
     </select>
-    <p class="hint">💡 Determines alignment engine. RNA/DNA flag defaults will auto-update.</p>
+    <p class="hint">💡 Determines alignment engine. For ATA experiments, see Advanced Options below to override with separate RNA/DNA mappers.</p>
     
     <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvancedConfig()" style="margin:0.5rem 0;">Show Advanced Options</button>
     
     <div id="advanced_config" style="display:none;">
+      <!-- Bridge section preview (auto-filled by experiment type) -->
+      <div id="bridge_preview" class="bridge-preview"></div>
+      
       <label>Forward bridge sequence <span class="default-badge">auto-filled by method</span></label>
       <input type="text" id="config_bridge_fwd" placeholder="e.g., AGCT or custom sequence">
       
       <label>Reverse bridge sequence</label>
       <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence">
       
-      <!-- ✅ NEW: RNA/DNA Mapper Options -->
+      <!-- ✅ RNA/DNA Mapper Options (only for ATA) -->
+      <div id="ata_mapper_options">
+        <label>RNA Alignment Tool (ATA only, overwrites general mapper)</label>
+        <select id="config_rna_align_tool">
+          <option value="hisat2">hisat2</option>
+          <option value="bwa_mem">bwa mem</option>
+          <option value="bwa_aln">bwa aln</option>
+          <option value="bowtie2">bowtie2</option>
+          <option value="star">star</option>
+        </select>
+        
+        <label>DNA Alignment Tool (ATA only, overwrites general mapper)</label>
+        <select id="config_dna_align_tool">
+          <option value="hisat2">hisat2</option>
+          <option value="bwa_mem">bwa mem</option>
+          <option value="bwa_aln">bwa aln</option>
+          <option value="bowtie2">bowtie2</option>
+          <option value="star">star</option>
+        </select>
+      </div>
+      
+      <!-- ✅ RNA/DNA Alignment Options (always shown, defaults by mapper) -->
       <label>RNA Alignment Options <span class="default-badge">mapper-dependent</span></label>
       <input type="text" id="config_rna_align_opts" value="--no-softclip --dta-cufflinks -k 100">
       
@@ -325,9 +350,11 @@
       if (group === 'ota') {
         methodSelect.innerHTML += `<option value="chirp">ChIRP-seq</option><option value="rap">RAP</option>`;
       } else if (group === 'ata') {
+        // ✅ Updated: Split classic into individual methods + added iMARGI
         methodSelect.innerHTML += `
           <option value="redc">Red-C / Red-ChIP</option>
-          <option value="margi">MARGI / iMARGI</option>
+          <option value="margi">MARGI</option>
+          <option value="imargi">iMARGI</option>
           <option value="grid">GRID-seq</option>
           <option value="char">ChAR-seq</option>
           <option value="radicl">RADICL-seq</option>
@@ -339,8 +366,23 @@
     function updateAtaOptions() {
       const method = document.getElementById('exp_method').value;
       const chromatinRadios = document.querySelectorAll('input[name="chromatin_potential"]');
+      const splitContainer = document.getElementById('split_container');
+      const splitHint = document.getElementById('split_hint');
+      
+      // Set chromatin potential default
       if (method === 'redc') chromatinRadios[0].checked = true;
       else chromatinRadios[1].checked = true;
+      
+      // ✅ iMARGI: Disable split option and force bridge_processing = false
+      if (method === 'imargi') {
+        splitContainer.style.display = 'none';
+        document.querySelector('input[name="split_rna_dna"][value="no"]').checked = true;
+        splitHint.textContent = '💡 iMARGI protocol: RNA-DNA separation is handled internally.';
+      } else {
+        splitContainer.style.display = 'flex';
+        splitHint.textContent = '💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.';
+      }
+      
       toggleRnaseqOption();
       document.querySelectorAll('input[name="chromatin_potential"]').forEach(r => r.onchange = toggleRnaseqOption);
     }
@@ -490,17 +532,17 @@
       document.body.appendChild(a); a.click(); a.remove();
     }
 
-    // ===== STEP 3 & 4: CONFIG & LAUNCH =====
+    // ===== STEP 3: CONFIG GENERATOR =====
     
-    // ✅ NEW: Mapper defaults mapping
+    // ✅ Updated mapper defaults with bwa_mem specific flags
     const mapperDefaults = {
       hisat2: {
         rna: '--no-softclip --dta-cufflinks -k 100',
         dna: '--no-softclip -k 100 --no-spliced-alignment'
       },
       bwa_mem: {
-        rna: '-M -t 4 -Y',
-        dna: '-M -t 4 -Y'
+        rna: '-k 17 -T 17',
+        dna: '-k 17 -T 17'
       },
       bwa_aln: {
         rna: '-n 0.04 -l 32 -t 4',
@@ -516,37 +558,193 @@
       }
     };
 
+    // ✅ Bridge sequence presets by experiment type
+    const bridgePresets = {
+      grid: {
+        unsplit: {
+          dna_part: '*s[AG|AGCT]',
+          rna_part: '.',
+          bridge_proc: true,
+          debridge: 'bitap',
+          fwd: 'GTTCGGTGTGTG',
+          rev: 'CACACACCGAAC',
+          max_mm: 1,
+          min_len: 14
+        },
+        split: {
+          dna_part: '*',
+          rna_part: '.',
+          bridge_proc: false
+        }
+      },
+      imargi: {
+        // iMARGI: always bridge_proc=false, special rna_part
+        dna_part: '*',
+        rna_part: '-[2].',
+        bridge_proc: false,
+        debridge: 'chartools', // commented by default
+        fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', // commented by default
+        rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', // commented by default
+        max_mm: 1, // commented by default
+        min_len: 14 // commented by default
+      },
+      char: {
+        unsplit: {
+          dna_part: '*s[GATC|GATC]',
+          rna_part: '.',
+          bridge_proc: true,
+          debridge: 'bitap',
+          fwd: 'CTTGGACGCCGGTTTTTTT',
+          rev: 'AAAAAAACCGGCGTCCAAG',
+          max_mm: 1,
+          min_len: 14
+        },
+        split: {
+          dna_part: '*',
+          rna_part: '.',
+          bridge_proc: false
+        }
+      },
+      // OTA methods: always bridge_proc=false, all other params commented
+      ota: {
+        bridge_proc: false
+        // All other params commented out
+      }
+    };
+
     function updateMapperOptions() {
       const mapper = document.getElementById('config_mapper').value;
+      const method = document.getElementById('exp_method').value;
       const defaults = mapperDefaults[mapper] || mapperDefaults.hisat2;
+      
       document.getElementById('config_rna_align_opts').value = defaults.rna;
       document.getElementById('config_dna_align_opts').value = defaults.dna;
+      
+      // ✅ iMARGI: Restrict mapper options to bwa_mem and star only
+      if (method === 'imargi') {
+        const rnaSelect = document.getElementById('config_rna_align_tool');
+        const dnaSelect = document.getElementById('config_dna_align_tool');
+        const generalSelect = document.getElementById('config_mapper');
+        
+        // Filter options for iMARGI
+        const allowed = ['bwa_mem', 'star'];
+        [rnaSelect, dnaSelect, generalSelect].forEach(select => {
+          Array.from(select.options).forEach(opt => {
+            opt.disabled = !allowed.includes(opt.value);
+          });
+          // Ensure current value is allowed
+          if (!allowed.includes(select.value)) {
+            select.value = 'bwa_mem';
+          }
+        });
+      }
+    }
+
+    function updateBridgePreview() {
+      const group = document.getElementById('exp_group').value;
+      const method = document.getElementById('exp_method').value;
+      const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
+      const preview = document.getElementById('bridge_preview');
+      
+      let html = '<strong>🔗 Bridge/Restriction Settings Preview:</strong><br>';
+      
+      if (group === 'ota') {
+        // OTA: bridge_processing always false, all params commented
+        html += `<code style="color:#666">// BRIDGE SEARCH: --------------------------------------------------------------------------------<br>`;
+        html += `bridge_processing = false<br>`;
+        html += `// debridge_tool = "bitap"<br>`;
+        html += `// forward_bridge_seq = "..."<br>`;
+        html += `// reverse_bridge_seq = "..."<br>`;
+        html += `// dna_part_processing = "*"<br>`;
+        html += `// rna_part_processing = "."<br>`;
+        html += `// max_mismatches = 1<br>`;
+        html += `// min_rna_dna_parts_length = 14<br>`;
+        html += `// description_sequence = ...</code>`;
+      } else if (method === 'imargi') {
+        // iMARGI: special preset, bridge_proc always false
+        const preset = bridgePresets.imargi;
+        html += `<code>// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------<br>`;
+        html += `dna_part_processing = "${preset.dna_part}"<br>`;
+        html += `rna_part_processing = "${preset.rna_part}"<br>`;
+        html += `bridge_processing = ${preset.bridge_proc}<br>`;
+        html += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""<br>`;
+        html += `// debridge_tool = "${preset.debridge}"<br>`;
+        html += `// forward_bridge_seq = "${preset.fwd}"<br>`;
+        html += `// reverse_bridge_seq = "${preset.rev}"<br>`;
+        html += `// max_mismatches = ${preset.max_mm}<br>`;
+        html += `// min_rna_dna_parts_length = ${preset.min_len}</code>`;
+      } else if (['grid', 'char'].includes(method)) {
+        // GRID-seq or ChAR-seq: check split status
+        const key = split === 'yes' ? 'split' : 'unsplit';
+        const preset = bridgePresets[method][key];
+        html += `<code>// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------<br>`;
+        html += `dna_part_processing = "${preset.dna_part}"<br>`;
+        html += `rna_part_processing = "${preset.rna_part}"<br>`;
+        html += `bridge_processing = ${preset.bridge_proc}<br>`;
+        if (preset.bridge_proc) {
+          html += `debridge_tool = "${preset.debridge}"<br>`;
+          html += `forward_bridge_seq = "${preset.fwd}"<br>`;
+          html += `reverse_bridge_seq = "${preset.rev}"<br>`;
+          html += `max_mismatches = ${preset.max_mm}<br>`;
+          html += `min_rna_dna_parts_length = ${preset.min_len}<br>`;
+        }
+        html += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""</code>`;
+      } else {
+        // Default/other ATA methods: show generic placeholder
+        html += `<code>// Bridge settings auto-filled by experiment method.<br>`;
+        html += `// Edit fields below to customize.</code>`;
+      }
+      
+      preview.innerHTML = html;
     }
 
     function autoFillConfig() {
       const method = document.getElementById('exp_method').value;
       const group = document.getElementById('exp_group').value;
+      const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
+      
       document.getElementById('config_exp_summary').textContent = `${group.toUpperCase()} / ${method.toUpperCase()}`;
       document.getElementById('config_data_summary').textContent = document.querySelector('input[name="data_type"]:checked').value === 'pe' ? 'Paired-end' : 'Single-end';
       document.getElementById('config_chromatin_summary').textContent = document.querySelector('input[name="chromatin_potential"]:checked')?.value === 'yes' ? 'Enabled' : 'Disabled';
       document.getElementById('config_rnaseq_summary').textContent = (group === 'ata' && document.querySelector('input[name="include_rnaseq"]:checked')?.value === 'yes') || (group === 'ota' && document.querySelector('input[name="ota_control"]:checked')?.value === 'yes') ? 'Yes' : 'No';
       
-      const bridgeMap = {
-        'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
-        'margi': { f: 'CCCTTT', r: 'AAAGGG' },
-        'grid': { f: 'AGCT', r: 'TCGA' },
-        'char': { f: 'ANNNACTG', r: 'CAGTNNNT' },
-        'radicl': { f: 'AGCT', r: 'TCGA' },
-        'chirp': { f: 'CUSTOM', r: 'CUSTOM' },
-        'rap': { f: 'CUSTOM', r: 'CUSTOM' }
-      };
-      if (bridgeMap[method]) {
-        document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
-        document.getElementById('config_bridge_rev').value = bridgeMap[method].r;
+      // ✅ Auto-fill bridge sequences based on experiment type
+      if (group === 'ota') {
+        // OTA: bridge_processing = false, clear/editable fields
+        document.getElementById('config_bridge_fwd').value = '';
+        document.getElementById('config_bridge_rev').value = '';
+      } else if (method === 'imargi') {
+        // iMARGI: special preset
+        const preset = bridgePresets.imargi;
+        document.getElementById('config_bridge_fwd').value = preset.fwd;
+        document.getElementById('config_bridge_rev').value = preset.rev;
+      } else if (['grid', 'char'].includes(method)) {
+        // GRID-seq or ChAR-seq: use split/unsplit preset
+        const key = split === 'yes' ? 'split' : 'unsplit';
+        const preset = bridgePresets[method][key];
+        document.getElementById('config_bridge_fwd').value = preset.fwd || '';
+        document.getElementById('config_bridge_rev').value = preset.rev || '';
+      } else {
+        // Default ATA methods (redc, margi, radicl): use existing bridgeMap
+        const bridgeMap = {
+          'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
+          'margi': { f: 'CCCTTT', r: 'AAAGGG' },
+          'radicl': { f: 'AGCT', r: 'TCGA' }
+        };
+        if (bridgeMap[method]) {
+          document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
+          document.getElementById('config_bridge_rev').value = bridgeMap[method].r;
+        }
       }
       
-      // ✅ Initialize mapper options
+      // ✅ Initialize mapper options (handles iMARGI restriction)
       updateMapperOptions();
+      
+      // ✅ Update bridge preview
+      updateBridgePreview();
+      
+      // ✅ Show/hide ATA-specific mapper options
+      document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
     }
 
     function toggleGenomeInput() {
@@ -557,34 +755,96 @@
     function toggleAdvancedConfig() {
       const adv = document.getElementById('advanced_config');
       const btn = document.getElementById('toggleAdvBtn');
-      adv.style.display = adv.style.display === 'none' ? 'block' : 'none';
-      btn.textContent = adv.style.display === 'none' ? 'Show Advanced Options' : 'Hide Advanced Options';
+      const isHidden = adv.style.display === 'none';
+      adv.style.display = isHidden ? 'block' : 'none';
+      btn.textContent = isHidden ? 'Show Advanced Options' : 'Hide Advanced Options';
+      
+      if (!isHidden) {
+        // Update bridge preview and ATA options when showing advanced
+        updateBridgePreview();
+        const group = document.getElementById('exp_group').value;
+        document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
+      }
     }
 
     function generateConfig() {
       const method = document.getElementById('exp_method').value;
+      const group = document.getElementById('exp_group').value;
+      const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
       const genomeMode = document.getElementById('config_genome_mode').value;
       const genomeVal = genomeMode === 'name' ? (document.getElementById('config_genome_name').value.trim() || 'GRCh38') : document.getElementById('config_genome_fasta').value.trim();
       const annotBed = document.getElementById('config_annot_bed').value.trim();
       const annotGtf = document.getElementById('config_annot_gtf').value.trim();
       const showAdv = document.getElementById('advanced_config').style.display !== 'none';
+      
       const fwd = document.getElementById('config_bridge_fwd').value.trim() || 'AGCT';
       const rev = document.getElementById('config_bridge_rev').value.trim() || 'TCGA';
       const mapper = document.getElementById('config_mapper').value;
-      
-      // ✅ NEW: Read RNA/DNA mapper options
       const rnaOpts = document.getElementById('config_rna_align_opts').value.trim();
       const dnaOpts = document.getElementById('config_dna_align_opts').value.trim();
       
+      // ✅ Get RNA/DNA align tools (ATA only, otherwise use general mapper)
+      const rnaAlignTool = group === 'ata' ? document.getElementById('config_rna_align_tool').value : mapper;
+      const dnaAlignTool = group === 'ata' ? document.getElementById('config_dna_align_tool').value : mapper;
+      
       let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
+      
+      // Core params
       cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\ndedup_tool = "fastuniq"\ntrim_tool = "fastp"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = 'pear'\n`;
+      
+      // ✅ Add RNA/DNA align tools for ATA (overwrite general align_tool)
+      if (group === 'ata') {
+        cfg += `rna_align_tool = '${rnaAlignTool}'\ndna_align_tool = '${dnaAlignTool}'\n`;
+      }
+      
+      // Reference
       cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
       cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
-      cfg += `bridge_processing = true\ndebridge_tool = "bitap"\nforward_bridge_seq = "${fwd}"\nreverse_bridge_seq = "${rev}"\n`;
-      cfg += `dna_part_processing = "*"\nrna_part_processing = "."\nmax_mismatches = 1\nmin_rna_dna_parts_length = 14\n`;
-      cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+      
+      // ✅ Bridge section based on experiment type
+      if (group === 'ota') {
+        // OTA: bridge_processing = false, all other params commented
+        cfg += `// BRIDGE SEARCH: --------------------------------------------------------------------------------\n`;
+        cfg += `bridge_processing = false\n`;
+        cfg += `// debridge_tool = "bitap"\n// forward_bridge_seq = "${fwd}"\n// reverse_bridge_seq = "${rev}"\n`;
+        cfg += `// dna_part_processing = "*"\n// rna_part_processing = "."\n// max_mismatches = 1\n// min_rna_dna_parts_length = 14\n`;
+        cfg += `// description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+      } else if (method === 'imargi') {
+        // iMARGI: special preset, bridge_proc always false
+        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\n`;
+        cfg += `dna_part_processing = "*"\nrna_part_processing = "-[2]."\nbridge_processing = false\n`;
+        cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+        cfg += `// debridge_tool = "chartools"\n// forward_bridge_seq = "GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC"\n`;
+        cfg += `// reverse_bridge_seq = "GACACAGCTCACTCCCACACACCGAACTCCAAC"\n// max_mismatches = 1\n// min_rna_dna_parts_length = 14\n`;
+      } else if (['grid', 'char'].includes(method)) {
+        // GRID-seq or ChAR-seq: use split/unsplit preset
+        const key = split === 'yes' ? 'split' : 'unsplit';
+        const preset = bridgePresets[method][key];
+        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\n`;
+        cfg += `dna_part_processing = "${preset.dna_part}"\nrna_part_processing = "${preset.rna_part}"\nbridge_processing = ${preset.bridge_proc}\n`;
+        if (preset.bridge_proc) {
+          cfg += `debridge_tool = "${preset.debridge}"\nforward_bridge_seq = "${preset.fwd}"\nreverse_bridge_seq = "${preset.rev}"\n`;
+          cfg += `max_mismatches = ${preset.max_mm}\nmin_rna_dna_parts_length = ${preset.min_len}\n`;
+        }
+        cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+      } else {
+        // Default ATA methods (redc, margi, radicl): standard bridge config
+        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\n`;
+        cfg += `bridge_processing = true\ndebridge_tool = "bitap"\nforward_bridge_seq = "${fwd}"\nreverse_bridge_seq = "${rev}"\n`;
+        cfg += `dna_part_processing = "*"\nrna_part_processing = "."\nmax_mismatches = 1\nmin_rna_dna_parts_length = 14\n`;
+        cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+      }
+      
+      // Resources
       cfg += showAdv ? `max_memory = '${document.getElementById('config_max_memory').value}'\nmax_cpus = ${document.getElementById('config_max_cpus').value}\n` : `max_memory = '128.GB'\nmax_cpus = 16\n`;
-      cfg += `publish_dir_mode = 'copy'\n}\n\nprocess {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\nflags = [\n  fastq_dupaway: "--format fastq --compare-seq tight",\n  fastp: "-5 --correction --cut_window_size 5 --cut_mean_quality 26",\n  pear: "-p 0.01 -v 20 -n 50",\n  rna_align_options: "${rnaOpts}",\n  dna_align_options: "${dnaOpts}"\n]\n`;
+      cfg += `publish_dir_mode = 'copy'\n}\n\n`;
+      
+      // Process block
+      cfg += `process {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\n`;
+      
+      // Flags with RNA/DNA alignment options
+      cfg += `flags = [\n  fastq_dupaway: "--format fastq --compare-seq tight",\n  fastp: "-5 --correction --cut_window_size 5 --cut_mean_quality 26",\n  pear: "-p 0.01 -v 20 -n 50",\n  rna_align_options: "${rnaOpts}",\n  dna_align_options: "${dnaOpts}"\n]\n`;
+      
       document.getElementById('configOutput').value = cfg;
     }
 
@@ -621,7 +881,18 @@
       alert("✅ Setup complete!\n\nFiles ready for download:\n• samplesheet.csv\n• nextflow.config\n• command.txt\n\nRun the command in your terminal to start the pipeline.");
     }
 
-    window.addEventListener('load', () => toggleGenomeInput());
+    // Initialize on load
+    window.addEventListener('load', () => {
+      toggleGenomeInput();
+      // Add listener for split radio to update bridge preview
+      document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => {
+        r.onchange = () => {
+          if (document.getElementById('advanced_config').style.display !== 'none') {
+            updateBridgePreview();
+          }
+        };
+      });
+    });
   </script>
 </body>
 </html>
