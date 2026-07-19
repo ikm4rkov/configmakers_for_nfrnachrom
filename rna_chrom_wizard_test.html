@@ -15,6 +15,7 @@
     .hint { font-size: 0.8rem; color: #666; margin-top: 0.2rem; font-style: italic; }
     .warning { font-size: 0.8rem; color: #d32f2f; margin-top: 0.2rem; }
     input, select { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    input:disabled, select:disabled { background: #f5f5f5; color: #666; cursor: not-allowed; }
     .radio-group { display: flex; gap: 1.5rem; margin: 0.5rem 0; }
     .radio-group label { display: flex; align-items: center; gap: 0.3rem; font-weight: normal; margin: 0; }
     .radio-group input { width: auto; }
@@ -117,10 +118,11 @@
     
     <!-- Data type (always shown) -->
     <label class="req">Sequencing Data Type</label>
-    <div class="radio-group">
+    <div class="radio-group" id="datatype_container">
       <label><input type="radio" name="data_type" value="se" checked> Single-end (SE)</label>
       <label><input type="radio" name="data_type" value="pe"> Paired-end (PE)</label>
     </div>
+    <p class="hint" id="datatype_hint">💡 Select your sequencing read type.</p>
     
     <div style="margin-top: 1.5rem; text-align: right;">
       <button class="btn" onclick="goToStep(2)">Next: Build Samplesheet →</button>
@@ -235,7 +237,7 @@
       <!-- ✅ RNA/DNA Mapper Options (only for ATA) -->
       <div id="ata_mapper_options">
         <label>RNA Alignment Tool (ATA only, overwrites general mapper)</label>
-        <select id="config_rna_align_tool">
+        <select id="config_rna_align_tool" onchange="updateAlignIndexFields()">
           <option value="hisat2">hisat2</option>
           <option value="bwa_mem">bwa mem</option>
           <option value="bwa_aln">bwa aln</option>
@@ -244,16 +246,29 @@
         </select>
         
         <label>DNA Alignment Tool (ATA only, overwrites general mapper)</label>
-        <select id="config_dna_align_tool">
+        <select id="config_dna_align_tool" onchange="updateAlignIndexFields()">
           <option value="hisat2">hisat2</option>
           <option value="bwa_mem">bwa mem</option>
           <option value="bwa_aln">bwa aln</option>
           <option value="bowtie2">bowtie2</option>
           <option value="star">star</option>
         </select>
+        
+        <!-- ✅ NEW: RNA/DNA Alignment Index fields -->
+        <div id="rna_index_field" style="display:none; margin-top:0.5rem;">
+          <label>RNA Alignment Index Path</label>
+          <input type="text" id="config_rna_align_index" placeholder="e.g., /ref/rna_index">
+          <p class="hint">💡 Will output as <code>&lt;mapper&gt;_index = 'path'</code> in config.</p>
+        </div>
+        
+        <div id="dna_index_field" style="display:none; margin-top:0.5rem;">
+          <label>DNA Alignment Index Path</label>
+          <input type="text" id="config_dna_align_index" placeholder="e.g., /ref/dna_index">
+          <p class="hint">💡 Will output as <code>&lt;mapper&gt;_index = 'path'</code> in config.</p>
+        </div>
       </div>
       
-      <!-- ✅ NEW: Processing Tool Options -->
+      <!-- ✅ Processing Tool Options -->
       <div class="tool-options">
         <label>Deduplication Tool</label>
         <select id="config_dedup_tool" onchange="updateDedupOptions()">
@@ -375,6 +390,8 @@
       const methodContainer = document.getElementById('method_container');
       const ataOptions = document.getElementById('ata_options');
       const otaOptions = document.getElementById('ota_options');
+      const splitContainer = document.getElementById('split_container');
+      const datatypeContainer = document.getElementById('datatype_container');
       
       methodContainer.style.display = group ? 'block' : 'none';
       ataOptions.style.display = group === 'ata' ? 'block' : 'none';
@@ -383,6 +400,13 @@
       
       if (group === 'ota') {
         methodSelect.innerHTML += `<option value="chirp">ChIRP-seq</option><option value="rap">RAP</option>`;
+        splitContainer.style.display = 'flex';
+        datatypeContainer.style.display = 'flex';
+        document.getElementById('split_hint').textContent = '💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.';
+        document.getElementById('datatype_hint').textContent = '💡 Select your sequencing read type.';
+        // Re-enable inputs
+        document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
+        document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = false);
       } else if (group === 'ata') {
         methodSelect.innerHTML += `
           <option value="redc">Red-C / Red-ChIP</option>
@@ -401,17 +425,33 @@
       const chromatinRadios = document.querySelectorAll('input[name="chromatin_potential"]');
       const splitContainer = document.getElementById('split_container');
       const splitHint = document.getElementById('split_hint');
+      const datatypeContainer = document.getElementById('datatype_container');
+      const datatypeHint = document.getElementById('datatype_hint');
       
       if (method === 'redc') chromatinRadios[0].checked = true;
       else chromatinRadios[1].checked = true;
       
-      if (method === 'imargi') {
+      // ✅ CHANGE 1: MARGI/iMARGI always use unsplit paired-end data
+      if (method === 'imargi' || method === 'margi') {
+        // Disable split option
         splitContainer.style.display = 'none';
         document.querySelector('input[name="split_rna_dna"][value="no"]').checked = true;
-        splitHint.textContent = '💡 iMARGI protocol: RNA-DNA separation is handled internally.';
+        document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = true);
+        splitHint.textContent = '💡 MARGI/iMARGI: RNA-DNA separation is handled internally (unsplit).';
+        
+        // Disable data type option, force PE
+        datatypeContainer.style.display = 'none';
+        document.querySelector('input[name="data_type"][value="pe"]').checked = true;
+        document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = true);
+        datatypeHint.textContent = '💡 MARGI/iMARGI: Always paired-end sequencing.';
       } else {
+        // Re-enable for other ATA methods
         splitContainer.style.display = 'flex';
+        datatypeContainer.style.display = 'flex';
+        document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
+        document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = false);
         splitHint.textContent = '💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.';
+        datatypeHint.textContent = '💡 Select your sequencing read type.';
       }
       
       toggleRnaseqOption();
@@ -427,8 +467,14 @@
 
     function setupSamplesheetUI() {
       const group = document.getElementById('exp_group').value;
+      const method = document.getElementById('exp_method').value;
       const chromatin = document.querySelector('input[name="chromatin_potential"]:checked')?.value;
       const otaCtrl = document.querySelector('input[name="ota_control"]:checked')?.value;
+      
+      // ✅ For MARGI/iMARGI: force unsplit PE mode regardless of user selection
+      const isMargi = method === 'margi' || method === 'imargi';
+      const split = isMargi ? 'no' : (document.querySelector('input[name="split_rna_dna"]:checked')?.value || 'no');
+      const dataType = isMargi ? 'pe' : (document.querySelector('input[name="data_type"]:checked')?.value || 'se');
       
       document.getElementById('exp_form').innerHTML = '';
       document.getElementById('ctrl_form').innerHTML = '';
@@ -579,6 +625,7 @@
         split: { dna_part: '*', rna_part: '.', bridge_proc: false }
       },
       imargi: { dna_part: '*', rna_part: '-[2].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
+      margi: { dna_part: '*', rna_part: '-[2].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
       char: {
         unsplit: { dna_part: '*s[GATC|GATC]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'CTTGGACGCCGGTTTTTTT', rev: 'AAAAAAACCGGCGTCCAAG', max_mm: 1, min_len: 14 },
         split: { dna_part: '*', rna_part: '.', bridge_proc: false }
@@ -586,7 +633,6 @@
       ota: { bridge_proc: false }
     };
 
-    // ✅ NEW: Tool option defaults
     const toolOptionDefaults = {
       dedup: { 'fastq-dupaway': '--format fastq --compare-seq tight', 'fastuniq': '' },
       trim: { 'fastp': '-5 --correction --cut_window_size 5 --cut_mean_quality 26', 'trimmomatic': '', 'bbduk': '', 'cutadapt': '' },
@@ -601,7 +647,7 @@
       document.getElementById('config_rna_align_opts').value = defaults.rna;
       document.getElementById('config_dna_align_opts').value = defaults.dna;
       
-      if (method === 'imargi') {
+      if (method === 'imargi' || method === 'margi') {
         const allowed = ['bwa_mem', 'star'];
         ['config_rna_align_tool', 'config_dna_align_tool', 'config_mapper'].forEach(id => {
           const select = document.getElementById(id);
@@ -609,9 +655,31 @@
           if (!allowed.includes(select.value)) select.value = 'bwa_mem';
         });
       }
+      updateAlignIndexFields();
     }
 
-    // ✅ NEW: Update tool option fields when tool changes
+    // ✅ CHANGE 2: Show/hide RNA/DNA index fields based on ATA + tool selection
+    function updateAlignIndexFields() {
+      const group = document.getElementById('exp_group').value;
+      const rnaTool = document.getElementById('config_rna_align_tool').value;
+      const dnaTool = document.getElementById('config_dna_align_tool').value;
+      
+      // Only show index fields for ATA experiments
+      if (group === 'ata') {
+        document.getElementById('rna_index_field').style.display = 'block';
+        document.getElementById('dna_index_field').style.display = 'block';
+        
+        // Update placeholder hints with mapper-specific suffix
+        document.querySelector('#rna_index_field .hint').innerHTML = 
+          `💡 Will output as <code>${rnaTool}_index = 'path'</code> in config.`;
+        document.querySelector('#dna_index_field .hint').innerHTML = 
+          `💡 Will output as <code>${dnaTool}_index = 'path'</code> in config.`;
+      } else {
+        document.getElementById('rna_index_field').style.display = 'none';
+        document.getElementById('dna_index_field').style.display = 'none';
+      }
+    }
+
     function updateDedupOptions() {
       const tool = document.getElementById('config_dedup_tool').value;
       document.getElementById('config_dedup_opts').value = toolOptionDefaults.dedup[tool] || '';
@@ -640,8 +708,8 @@
         html += `// dna_part_processing = "*"<br>// rna_part_processing = "."<br>`;
         html += `// max_mismatches = 1<br>// min_rna_dna_parts_length = 14<br>`;
         html += `// description_sequence = ...</code>`;
-      } else if (method === 'imargi') {
-        const preset = bridgePresets.imargi;
+      } else if (method === 'imargi' || method === 'margi') {
+        const preset = bridgePresets[method];
         html += `<code>// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------<br>`;
         html += `dna_part_processing = "${preset.dna_part}"<br>`;
         html += `rna_part_processing = "${preset.rna_part}"<br>`;
@@ -679,15 +747,15 @@
       const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
       
       document.getElementById('config_exp_summary').textContent = `${group.toUpperCase()} / ${method.toUpperCase()}`;
-      document.getElementById('config_data_summary').textContent = document.querySelector('input[name="data_type"]:checked').value === 'pe' ? 'Paired-end' : 'Single-end';
+      document.getElementById('config_data_summary').textContent = document.querySelector('input[name="data_type"]:checked')?.value === 'pe' ? 'Paired-end' : 'Single-end';
       document.getElementById('config_chromatin_summary').textContent = document.querySelector('input[name="chromatin_potential"]:checked')?.value === 'yes' ? 'Enabled' : 'Disabled';
       document.getElementById('config_rnaseq_summary').textContent = (group === 'ata' && document.querySelector('input[name="include_rnaseq"]:checked')?.value === 'yes') || (group === 'ota' && document.querySelector('input[name="ota_control"]:checked')?.value === 'yes') ? 'Yes' : 'No';
       
       if (group === 'ota') {
         document.getElementById('config_bridge_fwd').value = '';
         document.getElementById('config_bridge_rev').value = '';
-      } else if (method === 'imargi') {
-        const preset = bridgePresets.imargi;
+      } else if (method === 'imargi' || method === 'margi') {
+        const preset = bridgePresets[method];
         document.getElementById('config_bridge_fwd').value = preset.fwd;
         document.getElementById('config_bridge_rev').value = preset.rev;
       } else if (['grid', 'char'].includes(method)) {
@@ -698,7 +766,6 @@
       } else {
         const bridgeMap = {
           'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
-          'margi': { f: 'CCCTTT', r: 'AAAGGG' },
           'radicl': { f: 'AGCT', r: 'TCGA' }
         };
         if (bridgeMap[method]) {
@@ -711,7 +778,6 @@
       updateBridgePreview();
       document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
       
-      // ✅ Initialize tool options with defaults
       updateDedupOptions();
       updateTrimOptions();
       updateMergeOptions();
@@ -731,7 +797,9 @@
       
       if (!isHidden) {
         updateBridgePreview();
-        document.getElementById('ata_mapper_options').style.display = document.getElementById('exp_group').value === 'ata' ? 'block' : 'none';
+        const group = document.getElementById('exp_group').value;
+        document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
+        updateAlignIndexFields();
       }
     }
 
@@ -751,7 +819,6 @@
       const rnaOpts = document.getElementById('config_rna_align_opts').value.trim();
       const dnaOpts = document.getElementById('config_dna_align_opts').value.trim();
       
-      // ✅ NEW: Get processing tool values
       const dedupTool = document.getElementById('config_dedup_tool').value;
       const dedupOpts = document.getElementById('config_dedup_opts').value.trim();
       const trimTool = document.getElementById('config_trim_tool').value;
@@ -762,22 +829,23 @@
       const rnaAlignTool = group === 'ata' ? document.getElementById('config_rna_align_tool').value : mapper;
       const dnaAlignTool = group === 'ata' ? document.getElementById('config_dna_align_tool').value : mapper;
       
+      // ✅ CHANGE 2: Get RNA/DNA index paths
+      const rnaIndex = document.getElementById('config_rna_align_index').value.trim();
+      const dnaIndex = document.getElementById('config_dna_align_index').value.trim();
+      
       let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
       
       cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\n`;
-      
-      // ✅ NEW: Processing tools with options
-      cfg += `dedup_tool = "${dedupTool}"\n`;
-      cfg += `trim_tool = "${trimTool}"\n`;
-      cfg += `align_tool = '${mapper}'\n`;
-      cfg += `merge_pairedend_tool = '${mergeTool}'\n`;
+      cfg += `dedup_tool = "${dedupTool}"\ntrim_tool = "${trimTool}"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = '${mergeTool}'\n`;
       
       if (group === 'ata') {
         cfg += `rna_align_tool = '${rnaAlignTool}'\ndna_align_tool = '${dnaAlignTool}'\n`;
+        // ✅ CHANGE 2: Add index paths as <mapper>_index = 'path'
+        if (rnaIndex) cfg += `${rnaAlignTool}_index = '${rnaIndex}'\n`;
+        if (dnaIndex) cfg += `${dnaAlignTool}_index = '${dnaIndex}'\n`;
       }
       
       cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
-      cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       
       // Bridge section
       if (group === 'ota') {
@@ -786,12 +854,13 @@
         cfg += `// debridge_tool = "bitap"\n// forward_bridge_seq = "${fwd}"\n// reverse_bridge_seq = "${rev}"\n`;
         cfg += `// dna_part_processing = "*"\n// rna_part_processing = "."\n// max_mismatches = 1\n// min_rna_dna_parts_length = 14\n`;
         cfg += `// description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
-      } else if (method === 'imargi') {
+      } else if (method === 'imargi' || method === 'margi') {
+        const preset = bridgePresets[method];
         cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\n`;
-        cfg += `dna_part_processing = "*"\nrna_part_processing = "-[2]."\nbridge_processing = false\n`;
+        cfg += `dna_part_processing = "${preset.dna_part}"\nrna_part_processing = "${preset.rna_part}"\nbridge_processing = ${preset.bridge_proc}\n`;
         cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
-        cfg += `// debridge_tool = "chartools"\n// forward_bridge_seq = "GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC"\n`;
-        cfg += `// reverse_bridge_seq = "GACACAGCTCACTCCCACACACCGAACTCCAAC"\n// max_mismatches = 1\n// min_rna_dna_parts_length = 14\n`;
+        cfg += `// debridge_tool = "${preset.debridge}"\n// forward_bridge_seq = "${preset.fwd}"\n`;
+        cfg += `// reverse_bridge_seq = "${preset.rev}"\n// max_mismatches = ${preset.max_mm}\n// min_rna_dna_parts_length = ${preset.min_len}\n`;
       } else if (['grid', 'char'].includes(method)) {
         const key = split === 'yes' ? 'split' : 'unsplit';
         const preset = bridgePresets[method][key];
@@ -814,7 +883,6 @@
       
       cfg += `process {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\n`;
       
-      // ✅ NEW: Flags with all tool options
       cfg += `flags = [\n`;
       cfg += `  fastq_dupaway: "${dedupOpts}",\n`;
       cfg += `  fastp: "${trimOpts}",\n`;
