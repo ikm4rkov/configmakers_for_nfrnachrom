@@ -45,6 +45,8 @@
     .ref-box { font-size: 0.82rem; line-height: 1.4; }
     .bridge-preview { background: #f0f7ff; padding: 0.8rem; border-radius: 4px; margin: 0.5rem 0; font-family: monospace; font-size: 0.85rem; }
     .tool-options { margin: 0.8rem 0; padding: 0.5rem; background: #f8f9ff; border-left: 3px solid #0066cc; border-radius: 0 4px 4px 0; }
+    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0.8rem 0 0.3rem; font-weight: 500; }
+    .checkbox-label input { width: auto; }
   </style>
 </head>
 <body>
@@ -211,7 +213,7 @@
     <label>Annotation GTF file</label>
     <input type="text" id="config_annot_gtf" placeholder="/data/genes/gencode.v35.annotation.gtf">
     
-    <!-- ✅ Mapper Choice (Required) -->
+    <!-- ✅ REQUIRED: Mapper Choice -->
     <label class="req">Mapper Choice</label>
     <select id="config_mapper" onchange="updateMapperOptions()">
       <option value="hisat2">hisat2</option>
@@ -220,7 +222,13 @@
       <option value="bowtie2">bowtie2</option>
       <option value="star">star</option>
     </select>
-    <p class="hint">💡 Determines alignment engine. For ATA experiments, see Advanced Options below to override with separate RNA/DNA mappers.</p>
+    
+    <!-- ✅ NEW: General Genome Index -->
+    <label class="req">Genome Index Path</label>
+    <input type="text" id="config_genome_index" placeholder="e.g., /ref/index.ht2">
+    <p class="hint">💡 Outputs as <code>&lt;mapper&gt;_index = 'path'</code>. Used when RNA & DNA share the same mapper.</p>
+    
+    <p class="hint">💡 For ATA experiments, see Advanced Options below to override with separate RNA/DNA mappers & indices.</p>
     
     <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvancedConfig()" style="margin:0.5rem 0;">Show Advanced Options</button>
     
@@ -235,7 +243,7 @@
       <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence">
       
       <!-- ✅ RNA/DNA Mapper Options (only for ATA) -->
-      <div id="ata_mapper_options">
+      <div id="ata_mapper_options" style="display:none;">
         <label>RNA Alignment Tool (ATA only, overwrites general mapper)</label>
         <select id="config_rna_align_tool" onchange="updateAlignIndexFields()">
           <option value="hisat2">hisat2</option>
@@ -254,17 +262,20 @@
           <option value="star">star</option>
         </select>
         
-        <!-- ✅ NEW: RNA/DNA Alignment Index fields -->
+        <!-- ✅ Checkbox to toggle separate indices -->
+        <label class="checkbox-label">
+          <input type="checkbox" id="use_separate_indices" onchange="toggleSeparateIndices()">
+          Use separate RNA & DNA indices (overwrites general index)
+        </label>
+        
         <div id="rna_index_field" style="display:none; margin-top:0.5rem;">
           <label>RNA Alignment Index Path</label>
           <input type="text" id="config_rna_align_index" placeholder="e.g., /ref/rna_index">
-          <p class="hint">💡 Will output as <code>&lt;mapper&gt;_index = 'path'</code> in config.</p>
         </div>
         
         <div id="dna_index_field" style="display:none; margin-top:0.5rem;">
           <label>DNA Alignment Index Path</label>
           <input type="text" id="config_dna_align_index" placeholder="e.g., /ref/dna_index">
-          <p class="hint">💡 Will output as <code>&lt;mapper&gt;_index = 'path'</code> in config.</p>
         </div>
       </div>
       
@@ -404,7 +415,6 @@
         datatypeContainer.style.display = 'flex';
         document.getElementById('split_hint').textContent = '💡 Only enable if your FASTQ files are already separated into RNA/DNA reads.';
         document.getElementById('datatype_hint').textContent = '💡 Select your sequencing read type.';
-        // Re-enable inputs
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
         document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = false);
       } else if (group === 'ata') {
@@ -431,21 +441,18 @@
       if (method === 'redc') chromatinRadios[0].checked = true;
       else chromatinRadios[1].checked = true;
       
-      // ✅ CHANGE 1: MARGI/iMARGI always use unsplit paired-end data
+      // ✅ MARGI/iMARGI always use unsplit paired-end data
       if (method === 'imargi' || method === 'margi') {
-        // Disable split option
         splitContainer.style.display = 'none';
         document.querySelector('input[name="split_rna_dna"][value="no"]').checked = true;
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = true);
         splitHint.textContent = '💡 MARGI/iMARGI: RNA-DNA separation is handled internally (unsplit).';
         
-        // Disable data type option, force PE
         datatypeContainer.style.display = 'none';
         document.querySelector('input[name="data_type"][value="pe"]').checked = true;
         document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = true);
         datatypeHint.textContent = '💡 MARGI/iMARGI: Always paired-end sequencing.';
       } else {
-        // Re-enable for other ATA methods
         splitContainer.style.display = 'flex';
         datatypeContainer.style.display = 'flex';
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
@@ -471,7 +478,6 @@
       const chromatin = document.querySelector('input[name="chromatin_potential"]:checked')?.value;
       const otaCtrl = document.querySelector('input[name="ota_control"]:checked')?.value;
       
-      // ✅ For MARGI/iMARGI: force unsplit PE mode regardless of user selection
       const isMargi = method === 'margi' || method === 'imargi';
       const split = isMargi ? 'no' : (document.querySelector('input[name="split_rna_dna"]:checked')?.value || 'no');
       const dataType = isMargi ? 'pe' : (document.querySelector('input[name="data_type"]:checked')?.value || 'se');
@@ -658,26 +664,23 @@
       updateAlignIndexFields();
     }
 
-    // ✅ CHANGE 2: Show/hide RNA/DNA index fields based on ATA + tool selection
+    // ✅ Show/hide separate index container & fields
     function updateAlignIndexFields() {
       const group = document.getElementById('exp_group').value;
+      const container = document.getElementById('ata_mapper_options');
+      container.style.display = group === 'ata' ? 'block' : 'none';
+      
+      // Update placeholder hints
       const rnaTool = document.getElementById('config_rna_align_tool').value;
       const dnaTool = document.getElementById('config_dna_align_tool').value;
-      
-      // Only show index fields for ATA experiments
-      if (group === 'ata') {
-        document.getElementById('rna_index_field').style.display = 'block';
-        document.getElementById('dna_index_field').style.display = 'block';
-        
-        // Update placeholder hints with mapper-specific suffix
-        document.querySelector('#rna_index_field .hint').innerHTML = 
-          `💡 Will output as <code>${rnaTool}_index = 'path'</code> in config.`;
-        document.querySelector('#dna_index_field .hint').innerHTML = 
-          `💡 Will output as <code>${dnaTool}_index = 'path'</code> in config.`;
-      } else {
-        document.getElementById('rna_index_field').style.display = 'none';
-        document.getElementById('dna_index_field').style.display = 'none';
-      }
+      document.querySelector('#rna_index_field + label .hint')?.remove();
+      document.querySelector('#dna_index_field + label .hint')?.remove();
+    }
+
+    function toggleSeparateIndices() {
+      const checked = document.getElementById('use_separate_indices').checked;
+      document.getElementById('rna_index_field').style.display = checked ? 'block' : 'none';
+      document.getElementById('dna_index_field').style.display = checked ? 'block' : 'none';
     }
 
     function updateDedupOptions() {
@@ -781,6 +784,10 @@
       updateDedupOptions();
       updateTrimOptions();
       updateMergeOptions();
+      
+      // Reset separate index checkbox & fields when navigating to config step
+      document.getElementById('use_separate_indices').checked = false;
+      toggleSeparateIndices();
     }
 
     function toggleGenomeInput() {
@@ -800,6 +807,7 @@
         const group = document.getElementById('exp_group').value;
         document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
         updateAlignIndexFields();
+        toggleSeparateIndices();
       }
     }
 
@@ -829,7 +837,8 @@
       const rnaAlignTool = group === 'ata' ? document.getElementById('config_rna_align_tool').value : mapper;
       const dnaAlignTool = group === 'ata' ? document.getElementById('config_dna_align_tool').value : mapper;
       
-      // ✅ CHANGE 2: Get RNA/DNA index paths
+      const useSeparate = document.getElementById('use_separate_indices').checked;
+      const generalIndex = document.getElementById('config_genome_index').value.trim();
       const rnaIndex = document.getElementById('config_rna_align_index').value.trim();
       const dnaIndex = document.getElementById('config_dna_align_index').value.trim();
       
@@ -838,14 +847,21 @@
       cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\n`;
       cfg += `dedup_tool = "${dedupTool}"\ntrim_tool = "${trimTool}"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = '${mergeTool}'\n`;
       
+      // ✅ Handle Index Logic
       if (group === 'ata') {
         cfg += `rna_align_tool = '${rnaAlignTool}'\ndna_align_tool = '${dnaAlignTool}'\n`;
-        // ✅ CHANGE 2: Add index paths as <mapper>_index = 'path'
-        if (rnaIndex) cfg += `${rnaAlignTool}_index = '${rnaIndex}'\n`;
-        if (dnaIndex) cfg += `${dnaAlignTool}_index = '${dnaIndex}'\n`;
+        if (useSeparate) {
+          if (rnaIndex) cfg += `${rnaAlignTool}_index = '${rnaIndex}'\n`;
+          if (dnaIndex) cfg += `${dnaAlignTool}_index = '${dnaIndex}'\n`;
+        } else if (generalIndex) {
+          cfg += `${mapper}_index = '${generalIndex}'\n`;
+        }
+      } else if (generalIndex) {
+        cfg += `${mapper}_index = '${generalIndex}'\n`;
       }
       
       cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
+      cfg += `stages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       
       // Bridge section
       if (group === 'ota') {
