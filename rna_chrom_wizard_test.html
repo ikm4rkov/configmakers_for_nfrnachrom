@@ -47,6 +47,7 @@
     .tool-options { margin: 0.8rem 0; padding: 0.5rem; background: #f8f9ff; border-left: 3px solid #0066cc; border-radius: 0 4px 4px 0; }
     .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0.8rem 0 0.3rem; font-weight: 500; }
     .checkbox-label input { width: auto; }
+    .upload-wrapper { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; }
   </style>
 </head>
 <body>
@@ -327,10 +328,14 @@
       <input type="number" id="config_max_cpus" value="16" min="1">
     </div>
     
-    <div style="margin-top:1rem;">
+    <!-- ✅ File Upload & Config Actions -->
+    <div class="upload-wrapper">
+      <input type="file" id="configUpload" accept=".config,.groovy,.txt" style="display:none;">
+      <button class="btn btn-secondary" onclick="document.getElementById('configUpload').click()">📂 Load Config File</button>
       <button class="btn" onclick="generateConfig()">Generate nextflow.config</button>
       <button class="btn btn-secondary" onclick="downloadConfig()">💾 Download config</button>
     </div>
+    <p class="hint">💡 Upload an existing <code>nextflow.config</code> to view/edit it. Matching form fields will be auto-filled where possible.</p>
     
     <textarea id="configOutput" placeholder="Generated config will appear here..."></textarea>
     <p class="editable-hint">✏️ You can edit the config above. Clicking "Generate" will update based on form values.</p>
@@ -670,11 +675,8 @@
       const container = document.getElementById('ata_mapper_options');
       container.style.display = group === 'ata' ? 'block' : 'none';
       
-      // Update placeholder hints
       const rnaTool = document.getElementById('config_rna_align_tool').value;
       const dnaTool = document.getElementById('config_dna_align_tool').value;
-      document.querySelector('#rna_index_field + label .hint')?.remove();
-      document.querySelector('#dna_index_field + label .hint')?.remove();
     }
 
     function toggleSeparateIndices() {
@@ -769,7 +771,7 @@
       } else {
         const bridgeMap = {
           'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' },
-          'radicl': { f: 'CTCGGCATTCCTGCTGAACCGCTCTTCCGATCT', r: 'GATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' }
+          'radicl': { f: 'AGCT', r: 'TCGA' }
         };
         if (bridgeMap[method]) {
           document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
@@ -785,7 +787,6 @@
       updateTrimOptions();
       updateMergeOptions();
       
-      // Reset separate index checkbox & fields when navigating to config step
       document.getElementById('use_separate_indices').checked = false;
       toggleSeparateIndices();
     }
@@ -861,7 +862,7 @@
       }
       
       cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
-      cfg += `stages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
+      cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       
       // Bridge section
       if (group === 'ota') {
@@ -918,6 +919,73 @@
       document.body.appendChild(a); a.click(); a.remove();
     }
 
+    // ===== FILE UPLOAD & DESERIALIZATION =====
+    document.getElementById('configUpload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const content = event.target.result;
+        document.getElementById('configOutput').value = content;
+        autoFillFormFromConfig(content);
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Reset for re-upload
+    });
+
+    function autoFillFormFromConfig(configText) {
+      const extract = (key) => {
+        // Matches: key = 'value' or key = "value"
+        const regex = new RegExp(`^\\s*${key}\\s*=\\s*['"]([^'"]*)['"]`, 'm');
+        const match = configText.match(regex);
+        return match ? match[1].trim() : null;
+      };
+
+      try {
+        // Mapper
+        const mapper = extract('align_tool');
+        if (mapper && ['hisat2','bwa_mem','bwa_aln','bowtie2','star'].includes(mapper)) {
+          document.getElementById('config_mapper').value = mapper;
+        }
+
+        // Bridge sequences
+        const fwd = extract('forward_bridge_seq');
+        if (fwd) document.getElementById('config_bridge_fwd').value = fwd;
+        const rev = extract('reverse_bridge_seq');
+        if (rev) document.getElementById('config_bridge_rev').value = rev;
+
+        // RNA/DNA align tools (if present)
+        const rnaAlign = extract('rna_align_tool');
+        if (rnaAlign) document.getElementById('config_rna_align_tool').value = rnaAlign;
+        const dnaAlign = extract('dna_align_tool');
+        if (dnaAlign) document.getElementById('config_dna_align_tool').value = dnaAlign;
+
+        // Genome
+        const genome = extract('genome');
+        if (genome) {
+          document.getElementById('config_genome_name').value = genome;
+          document.getElementById('config_genome_mode').value = 'name';
+        }
+        const genomeFasta = extract('genome_fasta');
+        if (genomeFasta) {
+          document.getElementById('config_genome_fasta').value = genomeFasta;
+          document.getElementById('config_genome_mode').value = 'fasta';
+        }
+
+        // Refresh UI state
+        updateMapperOptions();
+        toggleGenomeInput();
+        updateBridgePreview();
+        
+        alert('✅ Config loaded successfully!\n\nForm fields have been auto-filled where possible. You can edit the text box directly or regenerate using the form.');
+      } catch (e) {
+        console.warn('Auto-fill partial:', e);
+        alert('✅ Config loaded into text box.\n\n⚠️ Auto-fill encountered an issue (complex Groovy syntax). You can still edit and use the config directly.');
+      }
+    }
+
+    // ===== STEP 4: LAUNCH COMMAND =====
     function autoFillLaunchCommand() {
       document.getElementById('launch_exp_type').value = document.getElementById('exp_method').value;
     }
