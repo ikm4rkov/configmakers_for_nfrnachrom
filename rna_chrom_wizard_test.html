@@ -47,7 +47,7 @@
     .tool-options { margin: 0.8rem 0; padding: 0.5rem; background: #f8f9ff; border-left: 3px solid #0066cc; border-radius: 0 4px 4px 0; }
     .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0.8rem 0 0.3rem; font-weight: 500; }
     .checkbox-label input { width: auto; }
-    .upload-wrapper { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; }
+    .upload-wrapper { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -139,7 +139,12 @@
       <div class="step-number">2</div>
     </div>
     
-    <p class="hint" id="samplesheet_hint">Configure your input samples based on experiment settings.</p>
+    <!-- ✅ CHANGE 1: Global Experiment Name -->
+    <label class="req">🔬 Global Experiment Name</label>
+    <input type="text" id="global_exp_name" placeholder="e.g., HFFc6_K562 (used for all samples)">
+    <p class="hint">💡 Single experiment per sheet. RNA-seq rows will automatically get the <code>rnaseq_</code> prefix.</p>
+    
+    <p class="hint" id="samplesheet_hint" style="margin-top:0.5rem;">Configure your input samples based on experiment settings.</p>
     
     <!-- Dynamic Reference Example -->
     <div style="margin:0.8rem 0;">
@@ -245,39 +250,43 @@
       
       <!-- ✅ RNA/DNA Mapper Options (only for ATA) -->
       <div id="ata_mapper_options" style="display:none;">
-        <label>RNA Alignment Tool (ATA only, overwrites general mapper)</label>
-        <select id="config_rna_align_tool" onchange="updateAlignIndexFields()">
-          <option value="hisat2">hisat2</option>
-          <option value="bwa_mem">bwa mem</option>
-          <option value="bwa_aln">bwa aln</option>
-          <option value="bowtie2">bowtie2</option>
-          <option value="star">star</option>
-        </select>
+        <!-- ✅ CHANGE 2: Wrapper for RNA section -->
+        <div id="rna_sep_container" style="display:none; margin-bottom:0.8rem;">
+          <label>RNA Alignment Tool (ATA only)</label>
+          <select id="config_rna_align_tool" onchange="updateAlignIndexFields()">
+            <option value="hisat2">hisat2</option>
+            <option value="bwa_mem">bwa mem</option>
+            <option value="bwa_aln">bwa aln</option>
+            <option value="bowtie2">bowtie2</option>
+            <option value="star">star</option>
+          </select>
+          <div id="rna_index_field" style="margin-top:0.3rem; display:none;">
+            <label>RNA Alignment Index Path</label>
+            <input type="text" id="config_rna_align_index" placeholder="e.g., /ref/rna_index">
+          </div>
+        </div>
+
+        <!-- ✅ CHANGE 2: Wrapper for DNA section -->
+        <div id="dna_sep_container" style="display:none; margin-bottom:0.8rem;">
+          <label>DNA Alignment Tool (ATA only)</label>
+          <select id="config_dna_align_tool" onchange="updateAlignIndexFields()">
+            <option value="hisat2">hisat2</option>
+            <option value="bwa_mem">bwa mem</option>
+            <option value="bwa_aln">bwa aln</option>
+            <option value="bowtie2">bowtie2</option>
+            <option value="star">star</option>
+          </select>
+          <div id="dna_index_field" style="margin-top:0.3rem; display:none;">
+            <label>DNA Alignment Index Path</label>
+            <input type="text" id="config_dna_align_index" placeholder="e.g., /ref/dna_index">
+          </div>
+        </div>
         
-        <label>DNA Alignment Tool (ATA only, overwrites general mapper)</label>
-        <select id="config_dna_align_tool" onchange="updateAlignIndexFields()">
-          <option value="hisat2">hisat2</option>
-          <option value="bwa_mem">bwa mem</option>
-          <option value="bwa_aln">bwa aln</option>
-          <option value="bowtie2">bowtie2</option>
-          <option value="star">star</option>
-        </select>
-        
-        <!-- ✅ Checkbox to toggle separate indices -->
+        <!-- ✅ Checkbox to toggle separate mappers/indices -->
         <label class="checkbox-label">
-          <input type="checkbox" id="use_separate_indices" onchange="toggleSeparateIndices()">
-          Use separate RNA & DNA indices (overwrites general index)
+          <input type="checkbox" id="use_separate_mappers" onchange="toggleSeparateMappers()">
+          Use separate RNA & DNA mappers & indices
         </label>
-        
-        <div id="rna_index_field" style="display:none; margin-top:0.5rem;">
-          <label>RNA Alignment Index Path</label>
-          <input type="text" id="config_rna_align_index" placeholder="e.g., /ref/rna_index">
-        </div>
-        
-        <div id="dna_index_field" style="display:none; margin-top:0.5rem;">
-          <label>DNA Alignment Index Path</label>
-          <input type="text" id="config_dna_align_index" placeholder="e.g., /ref/dna_index">
-        </div>
       </div>
       
       <!-- ✅ Processing Tool Options -->
@@ -533,7 +542,10 @@
 
     function setupForm(prefix, labels) {
       const container = document.getElementById(`${prefix}_form`);
+      container.innerHTML = '';
+      // ✅ CHANGE 1: Skip creating input for the first column (Sample)
       labels.forEach((label, i) => {
+        if (i === 0) return; // Sample column handled globally
         const div = document.createElement('div');
         div.innerHTML = `<input type="text" id="${prefix}_${i}" placeholder="${label}">`;
         container.appendChild(div);
@@ -547,23 +559,30 @@
 
     function addRow(type) {
       const cols = currentMode.header.split(',');
-      const filtered = type === 'ctrl' && currentMode.showCtrl 
-        ? cols.filter(c => c !== 'control') 
-        : (type === 'exp' ? cols : cols);
-        
+      const expName = document.getElementById('global_exp_name').value.trim();
+      if (!expName) return alert("Please enter a Global Experiment Name first.");
+      
       const tbody = document.querySelector(`#${type}_table tbody`);
       const row = document.createElement('tr');
-      let html = '';
       
-      filtered.forEach((col, i) => {
-        const val = document.getElementById(`${type}_${i}`).value.trim();
-        html += `<td>${val}</td>`;
-      });
+      // ✅ CHANGE 1: Auto-fill sample column
+      const sampleName = type === 'ctrl' ? `rnaseq_${expName}` : expName;
+      let html = `<td>${sampleName}</td>`;
+      
+      // Get values from form inputs (starting from index 1)
+      for (let i = 1; i < cols.length; i++) {
+        const input = document.getElementById(`${type}_${i}`);
+        html += `<td>${input ? input.value.trim() : ''}</td>`;
+      }
       html += `<td><button class="remove-row" onclick="this.closest('tr').remove()">×</button></td>`;
       row.innerHTML = html;
       tbody.appendChild(row);
       
-      filtered.forEach((_, i) => document.getElementById(`${type}_${i}`).value = '');
+      // Clear inputs
+      for (let i = 1; i < cols.length; i++) {
+        const input = document.getElementById(`${type}_${i}`);
+        if (input) input.value = '';
+      }
     }
 
     function clearAllRows() {
@@ -669,18 +688,19 @@
       updateAlignIndexFields();
     }
 
-    // ✅ Show/hide separate index container & fields
     function updateAlignIndexFields() {
       const group = document.getElementById('exp_group').value;
       const container = document.getElementById('ata_mapper_options');
       container.style.display = group === 'ata' ? 'block' : 'none';
-      
-      const rnaTool = document.getElementById('config_rna_align_tool').value;
-      const dnaTool = document.getElementById('config_dna_align_tool').value;
     }
 
-    function toggleSeparateIndices() {
-      const checked = document.getElementById('use_separate_indices').checked;
+    // ✅ CHANGE 2: Toggle separate mappers/indices
+    function toggleSeparateMappers() {
+      const checked = document.getElementById('use_separate_mappers').checked;
+      document.getElementById('rna_sep_container').style.display = checked ? 'block' : 'none';
+      document.getElementById('dna_sep_container').style.display = checked ? 'block' : 'none';
+      
+      // Also show index fields if mappers are selected
       document.getElementById('rna_index_field').style.display = checked ? 'block' : 'none';
       document.getElementById('dna_index_field').style.display = checked ? 'block' : 'none';
     }
@@ -787,8 +807,9 @@
       updateTrimOptions();
       updateMergeOptions();
       
-      document.getElementById('use_separate_indices').checked = false;
-      toggleSeparateIndices();
+      // Reset separate mappers checkbox & fields when navigating to config step
+      document.getElementById('use_separate_mappers').checked = false;
+      toggleSeparateMappers();
     }
 
     function toggleGenomeInput() {
@@ -808,7 +829,7 @@
         const group = document.getElementById('exp_group').value;
         document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
         updateAlignIndexFields();
-        toggleSeparateIndices();
+        toggleSeparateMappers();
       }
     }
 
@@ -835,23 +856,24 @@
       const mergeTool = document.getElementById('config_merge_tool').value;
       const mergeOpts = document.getElementById('config_merge_opts').value.trim();
       
-      const rnaAlignTool = group === 'ata' ? document.getElementById('config_rna_align_tool').value : mapper;
-      const dnaAlignTool = group === 'ata' ? document.getElementById('config_dna_align_tool').value : mapper;
+      // ✅ CHANGE 2: Handle separate mappers logic
+      const useSeparate = document.getElementById('use_separate_mappers').checked;
+      const rnaAlignTool = useSeparate ? document.getElementById('config_rna_align_tool').value : mapper;
+      const dnaAlignTool = useSeparate ? document.getElementById('config_dna_align_tool').value : mapper;
       
-      const useSeparate = document.getElementById('use_separate_indices').checked;
       const generalIndex = document.getElementById('config_genome_index').value.trim();
-      const rnaIndex = document.getElementById('config_rna_align_index').value.trim();
-      const dnaIndex = document.getElementById('config_dna_align_index').value.trim();
+      const rnaIndex = useSeparate ? document.getElementById('config_rna_align_index').value.trim() : '';
+      const dnaIndex = useSeparate ? document.getElementById('config_dna_align_index').value.trim() : '';
       
       let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
       
       cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\n`;
       cfg += `dedup_tool = "${dedupTool}"\ntrim_tool = "${trimTool}"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = '${mergeTool}'\n`;
       
-      // ✅ Handle Index Logic
+      // ✅ CHANGE 2: Index & Mapper Logic
       if (group === 'ata') {
-        cfg += `rna_align_tool = '${rnaAlignTool}'\ndna_align_tool = '${dnaAlignTool}'\n`;
         if (useSeparate) {
+          cfg += `rna_align_tool = '${rnaAlignTool}'\ndna_align_tool = '${dnaAlignTool}'\n`;
           if (rnaIndex) cfg += `${rnaAlignTool}_index = '${rnaIndex}'\n`;
           if (dnaIndex) cfg += `${dnaAlignTool}_index = '${dnaIndex}'\n`;
         } else if (generalIndex) {
@@ -862,7 +884,7 @@
       }
       
       cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
-      cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
+      cfg += `stages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       
       // Bridge section
       if (group === 'ota') {
@@ -936,32 +958,27 @@
 
     function autoFillFormFromConfig(configText) {
       const extract = (key) => {
-        // Matches: key = 'value' or key = "value"
         const regex = new RegExp(`^\\s*${key}\\s*=\\s*['"]([^'"]*)['"]`, 'm');
         const match = configText.match(regex);
         return match ? match[1].trim() : null;
       };
 
       try {
-        // Mapper
         const mapper = extract('align_tool');
         if (mapper && ['hisat2','bwa_mem','bwa_aln','bowtie2','star'].includes(mapper)) {
           document.getElementById('config_mapper').value = mapper;
         }
 
-        // Bridge sequences
         const fwd = extract('forward_bridge_seq');
         if (fwd) document.getElementById('config_bridge_fwd').value = fwd;
         const rev = extract('reverse_bridge_seq');
         if (rev) document.getElementById('config_bridge_rev').value = rev;
 
-        // RNA/DNA align tools (if present)
         const rnaAlign = extract('rna_align_tool');
         if (rnaAlign) document.getElementById('config_rna_align_tool').value = rnaAlign;
         const dnaAlign = extract('dna_align_tool');
         if (dnaAlign) document.getElementById('config_dna_align_tool').value = dnaAlign;
 
-        // Genome
         const genome = extract('genome');
         if (genome) {
           document.getElementById('config_genome_name').value = genome;
@@ -973,7 +990,6 @@
           document.getElementById('config_genome_mode').value = 'fasta';
         }
 
-        // Refresh UI state
         updateMapperOptions();
         toggleGenomeInput();
         updateBridgePreview();
@@ -985,7 +1001,6 @@
       }
     }
 
-    // ===== STEP 4: LAUNCH COMMAND =====
     function autoFillLaunchCommand() {
       document.getElementById('launch_exp_type').value = document.getElementById('exp_method').value;
     }
