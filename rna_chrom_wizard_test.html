@@ -45,16 +45,17 @@
     .sample-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.5rem; align-items: end; margin: 0.8rem 0; padding: 0.8rem; background: #f8f9fa; border-radius: 4px; }
     .section-divider { border-top: 2px dashed #dee2e6; margin: 1.5rem 0; }
     .ref-box { font-size: 0.82rem; line-height: 1.4; }
-    .bridge-preview { background: #f0f7ff; padding: 0.8rem; border-radius: 4px; margin: 0.5rem 0; font-family: monospace; font-size: 0.85rem; }
     .tool-options { margin: 0.8rem 0; padding: 0.5rem; background: #f8f9ff; border-left: 3px solid #0066cc; border-radius: 0 4px 4px 0; }
     .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin: 0.8rem 0 0.3rem; font-weight: 500; }
     .checkbox-label input { width: auto; }
     .upload-wrapper { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap; }
     .tab-navigation { display: flex; justify-content: space-between; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+    .ata-req-box { background: #fff8e1; border: 1px solid #ffe082; padding: 1rem; border-radius: 4px; margin-top: 1rem; }
+    .bridge-hint { font-style: italic; color: #555; margin: 0.5rem 0; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <h1> RNA-Chrom Pipeline Setup Wizard</h1>
+  <h1>RNA-Chrom Pipeline Setup Wizard</h1>
   <p>Step-by-step configuration for Nextflow pipeline.</p>
 
   <!-- Progress Bar (Clickable) -->
@@ -67,20 +68,20 @@
   <!-- ===== STEP 1: EXPERIMENT & CONFIG (MERGED) ===== -->
   <div id="step-1" class="wizard-step active">
     <div class="step-header">
-      <h3> Experiment Setup</h3>
+      <h3>Experiment Setup</h3>
       <div class="step-number">1</div>
     </div>
     
     <label class="req">Experiment Group</label>
-    <select id="exp_group" onchange="updateMethodOptions()">
+    <select id="exp_group" onchange="updateMethodOptions(); fullResetSamplesheet();">
       <option value="">— Select group —</option>
-      <option value="ota">One-to-all (OTA)</option>
-      <option value="ata">All-to-all (ATA)</option>
+      <option value="ota">One-to-All (OTA)</option>
+      <option value="ata">All-to-All (ATA)</option>
     </select>
     
     <div id="method_container" style="display:none;">
       <label class="req">Experiment Method</label>
-      <select id="exp_method" onchange="updateAtaOptions()">
+      <select id="exp_method" onchange="updateAtaOptions(); fullResetSamplesheet(); updateBridgeFields();">
         <!-- Dynamically populated -->
       </select>
     </div>
@@ -92,25 +93,24 @@
         <label><input type="radio" name="chromatin_potential" value="yes" checked> Yes</label>
         <label><input type="radio" name="chromatin_potential" value="no"> No</label>
       </div>
-      <p class="hint"> Enables RNA-seq integration for chromatin state analysis.</p>
+      <p class="hint">Enables RNA-seq integration for chromatin state analysis.</p>
       
-      <label>Is data separated by linker/bridge sequence</label>
+      <label>Split RNA-DNA Parts (pre-processed data)</label>
       <div class="radio-group" id="split_container">
         <label><input type="radio" name="split_rna_dna" value="yes"> Yes</label>
         <label><input type="radio" name="split_rna_dna" value="no" checked> No</label>
       </div>
-      <p class="hint" id="split_hint"> Only enable if your FASTQ files are already separated into RNA/DNA reads.</p>
-     
+      <p class="hint" id="split_hint">Only enable if your FASTQ files are already separated into RNA/DNA reads.</p>
     </div>
 
     <!-- OTA-specific options -->
     <div id="ota_options" style="display:none;">
       <label>Include Input Control Samples</label>
       <div class="radio-group">
-        <label><input type="radio" name="ota_control" value="yes"> Yes</label>
-        <label><input type="radio" name="ota_control" value="no" checked> No</label>
+        <label><input type="radio" name="ota_control" value="yes" onchange="fullResetSamplesheet()"> Yes</label>
+        <label><input type="radio" name="ota_control" value="no" checked onchange="fullResetSamplesheet()"> No</label>
       </div>
-      <p class="hint"> Adds a <code>control</code> column to specify input controls per sample.</p>
+      <p class="hint">Adds a <code>control</code> column to specify input controls per sample.</p>
     </div>
     
     <!-- Data type (always shown) -->
@@ -119,151 +119,151 @@
       <label><input type="radio" name="data_type" value="se" checked> Single-end (SE)</label>
       <label><input type="radio" name="data_type" value="pe"> Paired-end (PE)</label>
     </div>
-    <p class="hint" id="datatype_hint"> Select your sequencing read type.</p>
+    <p class="hint" id="datatype_hint">Select your sequencing read type.</p>
     
     <div class="section-divider"></div>
     
-    <!--  CONFIG GENERATOR INSERTED HERE -->
-    <h3 style="margin-top:1rem;"> Pipeline Configuration</h3>
-    <p class="hint">Most values auto-filled from your experiment setup above. Edit if needed.</p>
+    <!-- CONFIG GENERATOR INSERTED HERE -->
+    <h3 style="margin-top:1rem;">Pipeline Configuration</h3>
+    <p class="hint">Fields marked * are required. Fill them to generate a valid config.</p>
+    
+    <label class="req">Genome FASTA Path</label>
+    <input type="text" id="config_genome_fasta" placeholder="/path/to/genome.fa" oninput="markConfigDirty()">
+    
+    <label class="req">Annotation BEDRC File</label>
+    <input type="text" id="config_annot_bed" placeholder="/path/to/genes.bedrc" oninput="markConfigDirty()">
+    
+    <label class="req">Annotation GTF File</label>
+    <input type="text" id="config_annot_gtf" placeholder="/path/to/genes.gtf" oninput="markConfigDirty()">
 
+    <!-- REQUIRED FIELD -->
+    <label class="req">Ribosomal Protein Lineage Genes List Path</label>
+    <input type="text" id="detect_strand_genes_list" placeholder="${projectDir}/assets/gencode_v43_rpl_genes.txt" oninput="markConfigDirty()">
     
-    <label>Genome reference</label>
-    <select id="config_genome_mode" onchange="toggleGenomeInput()">
-      <option value="name">Use genome name (auto-download)</option>
-      <option value="fasta">Use custom FASTA path</option>
-    </select>
-    <input type="text" id="config_genome_name" placeholder="e.g., GRCh38, mm10" style="margin-top:0.3rem;">
-    <input type="text" id="config_genome_fasta" placeholder="e.g., /path/to/genome.fa" style="display:none; margin-top:0.3rem;">
-    
-    <label>Annotation BEDRC file</label>
-    <input type="text" id="config_annot_bed" placeholder="/data/genes/RNA_Chrom_genes_hg38.bedrc">
-    
-    <label>Annotation GTF file</label>
-    <input type="text" id="config_annot_gtf" placeholder="/data/genes/gencode.v35.annotation.gtf">
-    
-    <!-- ✅ REQUIRED: Mapper Choice -->
-    <label class="req">Mapper Choice</label>
-    <select id="config_mapper" onchange="updateMapperOptions()">
+    <!-- MAPPER CHOICE (Visible for OTA, hidden for ATA) -->
+    <label class="req" id="mapper_label_ota">Mapper Choice</label>
+    <select id="config_mapper" onchange="updateMapperOptions(); markConfigDirty(); updateBridgeFields();" style="display:block;">
       <option value="hisat2">hisat2</option>
       <option value="bwa_mem">bwa mem</option>
       <option value="bwa_aln">bwa aln</option>
       <option value="bowtie2">bowtie2</option>
       <option value="star">star</option>
     </select>
+
+    <!-- ATA-SPECIFIC MAPPERS (Visible only for ATA) -->
+    <div id="ata_mappers_container" class="ata-req-box" style="display:none;">
+      <label class="req">RNA Alignment Tool (ATA Required)</label>
+      <select id="config_rna_align_tool" onchange="markConfigDirty(); updateIndexVisibility();">
+        <option value="hisat2">hisat2</option>
+        <option value="bwa_mem">bwa mem</option>
+        <option value="bwa_aln">bwa aln</option>
+        <option value="bowtie2">bowtie2</option>
+        <option value="star">star</option>
+      </select>
+      
+      <label class="req">DNA Alignment Tool (ATA Required)</label>
+      <select id="config_dna_align_tool" onchange="markConfigDirty(); updateIndexVisibility();">
+        <option value="hisat2">hisat2</option>
+        <option value="bwa_mem">bwa mem</option>
+        <option value="bwa_aln">bwa aln</option>
+        <option value="bowtie2">bowtie2</option>
+        <option value="star">star</option>
+      </select>
+      
+      <!-- Smart Index Field: One if mappers match, two if different -->
+      <div id="single_index_container" style="display:none; margin-top:0.5rem;">
+        <label class="req">Alignment Index Path (shared)</label>
+        <input type="text" id="config_shared_index" placeholder="/path/to/index" oninput="markConfigDirty()">
+      </div>
+      
+      <div id="dual_index_container" style="display:none; margin-top:0.5rem;">
+        <label class="req">RNA Alignment Index Path</label>
+        <input type="text" id="config_rna_align_index" placeholder="/path/to/rna_index" oninput="markConfigDirty()">
+        <label class="req" style="margin-top:0.3rem;">DNA Alignment Index Path</label>
+        <input type="text" id="config_dna_align_index" placeholder="/path/to/dna_index" oninput="markConfigDirty()">
+      </div>
+    </div>
     
-    <!-- ✅ NEW: General Genome Index -->
-    <label class="req">Genome Index Path</label>
-    <input type="text" id="config_genome_index" placeholder="e.g., /ref/index.ht2">
-    <p class="hint"> Outputs as <code>&lt;mapper&gt;_index = 'path'</code>. Used when RNA & DNA share the same mapper.</p>
+    <p class="hint">For ATA experiments, separate RNA/DNA mappers & indices are required above.</p>
     
-    <p class="hint"> For ATA experiments, see Advanced Options below to override with separate RNA/DNA mappers & indices.</p>
-    
-    <!-- 🔧 FIX: Toggle button logic corrected below -->
     <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvancedConfig()" style="margin:0.5rem 0;">Show Advanced Options</button>
     
     <div id="advanced_config" style="display:none;">
-      <div id="bridge_preview" class="bridge-preview"></div>
+      <!-- BRIDGE ORIENTATION HINT -->
+      <p class="bridge-hint">Bridge sequence determined as: <code>5'-DNA part - forward bridge - RNA part-3'</code></p>
       
       <label>Forward bridge sequence <span class="default-badge">auto-filled by method</span></label>
-      <input type="text" id="config_bridge_fwd" placeholder="e.g., AGCT or custom sequence">
+      <input type="text" id="config_bridge_fwd" placeholder="e.g., AGCT or custom sequence" oninput="markConfigDirty()">
       
       <label>Reverse bridge sequence</label>
-      <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence">
+      <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence" oninput="markConfigDirty()">
       
-      <div id="ata_mapper_options" style="display:none;">
-        <div id="rna_sep_container" style="display:none; margin-bottom:0.8rem;">
-          <label>RNA Alignment Tool (ATA only)</label>
-          <select id="config_rna_align_tool" onchange="updateAlignIndexFields()">
-            <option value="hisat2">hisat2</option>
-            <option value="bwa_mem">bwa mem</option>
-            <option value="bwa_aln">bwa aln</option>
-            <option value="bowtie2">bowtie2</option>
-            <option value="star">star</option>
-          </select>
-          <div id="rna_index_field" style="margin-top:0.3rem; display:none;">
-            <label>RNA Alignment Index Path</label>
-            <input type="text" id="config_rna_align_index" placeholder="e.g., /ref/rna_index">
-          </div>
-        </div>
-
-        <div id="dna_sep_container" style="display:none; margin-bottom:0.8rem;">
-          <label>DNA Alignment Tool (ATA only)</label>
-          <select id="config_dna_align_tool" onchange="updateAlignIndexFields()">
-            <option value="hisat2">hisat2</option>
-            <option value="bwa_mem">bwa mem</option>
-            <option value="bwa_aln">bwa aln</option>
-            <option value="bowtie2">bowtie2</option>
-            <option value="star">star</option>
-          </select>
-          <div id="dna_index_field" style="margin-top:0.3rem; display:none;">
-            <label>DNA Alignment Index Path</label>
-            <input type="text" id="config_dna_align_index" placeholder="e.g., /ref/dna_index">
-          </div>
-        </div>
-        
-        <label class="checkbox-label">
-          <input type="checkbox" id="use_separate_mappers" onchange="toggleSeparateMappers()">
-          Use separate RNA & DNA mappers & indices
-        </label>
-      </div>
+      <!-- Debridge Tool Dropdown -->
+      <label>De-bridge Tool</label>
+      <select id="config_debridge_tool" onchange="markConfigDirty()">
+        <option value="bitap" selected>bitap (default, recommended)</option>
+        <option value="chartools">chartools (not thoroughly tested)</option>
+      </select>
+      
+      <label>Genome Index Path (Optional)</label>
+      <input type="text" id="config_genome_index" placeholder="Leave empty to auto-calculate from FASTA" oninput="markConfigDirty()">
       
       <div class="tool-options">
         <label>Deduplication Tool</label>
-        <select id="config_dedup_tool" onchange="updateDedupOptions()">
+        <select id="config_dedup_tool" onchange="updateDedupOptions(); markConfigDirty();">
           <option value="fastq-dupaway" selected>fastq-dupaway (default)</option>
           <option value="fastuniq">fastuniq</option>
         </select>
-        <input type="text" id="config_dedup_opts" value="--format fastq --compare-seq tight" style="margin-top:0.3rem;" placeholder="Options for fastq-dupaway">
-        <p class="hint"> Default flags for fastq-dupaway. Edit to customize.</p>
+        <input type="text" id="config_dedup_opts" value="--format fastq --compare-seq tight" style="margin-top:0.3rem;" placeholder="Options for fastq-dupaway" oninput="markConfigDirty()">
+        <p class="hint">Default flags for fastq-dupaway. Edit to customize.</p>
       </div>
       
       <div class="tool-options">
         <label>Trimming Tool</label>
-        <select id="config_trim_tool" onchange="updateTrimOptions()">
+        <select id="config_trim_tool" onchange="updateTrimOptions(); markConfigDirty();">
           <option value="fastp" selected>fastp (default)</option>
           <option value="trimmomatic">trimmomatic</option>
           <option value="bbduk">bbduk</option>
           <option value="cutadapt">cutadapt</option>
         </select>
-        <input type="text" id="config_trim_opts" value="-5 --correction --cut_window_size 5 --cut_mean_quality 26" style="margin-top:0.3rem;" placeholder="Options for fastp">
-        <p class="hint"> Default flags for fastp. Edit to customize.</p>
+        <input type="text" id="config_trim_opts" value="-5 --correction --cut_window_size 5 --cut_mean_quality 26" style="margin-top:0.3rem;" placeholder="Options for fastp" oninput="markConfigDirty()">
+        <p class="hint">Default flags for fastp. Edit to customize.</p>
       </div>
       
       <div class="tool-options">
         <label>Paired-End Merge Tool</label>
-        <select id="config_merge_tool" onchange="updateMergeOptions()">
+        <select id="config_merge_tool" onchange="updateMergeOptions(); markConfigDirty();">
           <option value="pear" selected>pear (default)</option>
           <option value="bbmerge">bbmerge</option>
         </select>
-        <input type="text" id="config_merge_opts" value="-p 0.01 -v 20 -n 50" style="margin-top:0.3rem;" placeholder="Options for pear">
-        <p class="hint"> Default flags for pear. Edit to customize.</p>
+        <input type="text" id="config_merge_opts" value="-p 0.01 -v 20 -n 50" style="margin-top:0.3rem;" placeholder="Options for pear" oninput="markConfigDirty()">
+        <p class="hint">Default flags for pear. Edit to customize.</p>
       </div>
       
       <label>RNA Alignment Options <span class="default-badge">mapper-dependent</span></label>
-      <input type="text" id="config_rna_align_opts" value="--no-softclip --dta-cufflinks -k 100">
+      <input type="text" id="config_rna_align_opts" value="--no-softclip --dta-cufflinks -k 100" oninput="markConfigDirty()">
       
       <label>DNA Alignment Options <span class="default-badge">mapper-dependent</span></label>
-      <input type="text" id="config_dna_align_opts" value="--no-softclip -k 100 --no-spliced-alignment">
-      <p class="hint"> These flags apply to the chosen mapper. Edit to override defaults.</p>
+      <input type="text" id="config_dna_align_opts" value="--no-softclip -k 100 --no-spliced-alignment" oninput="markConfigDirty()">
+      <p class="hint">These flags apply to the chosen mapper. Edit to override defaults.</p>
       
       <label>Max memory per process</label>
-      <input type="text" id="config_max_memory" value="128.GB">
+      <input type="text" id="config_max_memory" value="128.GB" oninput="markConfigDirty()">
       
       <label>Max CPUs per process</label>
-      <input type="number" id="config_max_cpus" value="16" min="1">
+      <input type="number" id="config_max_cpus" value="16" min="1" oninput="markConfigDirty()">
     </div>
     
     <div class="upload-wrapper">
       <input type="file" id="configUpload" accept=".config,.groovy,.txt" style="display:none;">
-      <button class="btn btn-secondary" onclick="document.getElementById('configUpload').click()"> Load Config File</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('configUpload').click()">Load Config File</button>
       <button class="btn" onclick="generateConfig()">Generate nextflow.config</button>
-      <button class="btn btn-secondary" onclick="downloadConfig()"> Download config</button>
+      <button class="btn btn-secondary" onclick="downloadConfig()">Download config</button>
     </div>
-    <p class="hint"> Upload an existing <code>nextflow.config</code> to view/edit it. Matching form fields will be auto-filled where possible.</p>
+    <p class="hint">Upload an existing <code>nextflow.config</code> to view/edit it. Matching form fields will be auto-filled where possible.</p>
     
     <textarea id="configOutput" placeholder="Generated config will appear here..."></textarea>
-    <p class="editable-hint"> You can edit the config above. Clicking "Generate" will update based on form values.</p>
+    <p class="editable-hint" id="configHint">You can edit the config above. Clicking "Generate" will update based on form values.</p>
     
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -276,25 +276,25 @@
   <!-- ===== STEP 2: SAMPLESHEET BUILDER ===== -->
   <div id="step-2" class="wizard-step">
     <div class="step-header">
-      <h3> Samplesheet Builder</h3>
+      <h3>Samplesheet Builder</h3>
       <div class="step-number">2</div>
     </div>
     
-    <!-- ✅ CHANGE 3: Reordered (Example first, then Global Name) -->
+    <!-- Reordered (Example first, then Global Name) -->
     <div style="margin:0.5rem 0;">
-      <label> Expected Format (readonly reference):</label>
+      <label>Expected Format (readonly reference):</label>
       <textarea id="samplesheet_ref" class="ref-box" readonly></textarea>
     </div>
 
-    <label class="req"> Global Experiment Name</label>
+    <label class="req">Global Experiment Name</label>
     <input type="text" id="global_exp_name" placeholder="e.g., HFFc6_K562 (used for all samples)">
-    <p class="hint"> Single experiment per sheet. RNA-seq rows will automatically get the <code>rnaseq_</code> prefix.</p>
-    <p id="exp_name_lock_warning" class="warning" style="display:none;"> Experiment name is locked because RNA-seq samples exist. Delete all RNA-seq rows to unlock.</p>
+    <p class="hint">Single experiment per sheet. RNA-seq rows will automatically get the <code>rnaseq_</code> prefix.</p>
+    <p id="exp_name_lock_warning" class="warning" style="display:none;">Experiment name is locked because samples exist. Delete all rows to unlock.</p>
     
     <p class="hint" id="samplesheet_hint" style="margin-top:0.5rem;">Configure your input samples based on experiment settings.</p>
 
     <!-- Experimental Samples Section -->
-    <h4> Experimental Samples</h4>
+    <h4>Experimental Samples</h4>
     <div id="exp_form" class="sample-form"></div>
     <button class="btn btn-sm" onclick="addRow('exp')">+ Add Experimental Row</button>
     <table class="samplesheet-table" id="exp_table">
@@ -306,7 +306,7 @@
 
     <!-- Control/RNA-seq Samples Section -->
     <div id="ctrl_section">
-      <h4 id="ctrl_title"> RNA-seq / Control Samples</h4>
+      <h4 id="ctrl_title">RNA-seq / Control Samples</h4>
       <div id="ctrl_form" class="sample-form"></div>
       <button class="btn btn-sm" onclick="addRow('ctrl')">+ Add Control/RNA-seq Row</button>
       <table class="samplesheet-table" id="ctrl_table">
@@ -317,7 +317,7 @@
     
     <div style="margin-top:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
       <button class="btn" onclick="generateSamplesheet()">Generate CSV</button>
-      <button class="btn btn-secondary" onclick="downloadSamplesheet()"> Download samplesheet.csv</button>
+      <button class="btn btn-secondary" onclick="downloadSamplesheet()">Download samplesheet.csv</button>
       <button class="btn btn-sm btn-secondary" onclick="clearAllRows()">Clear All</button>
     </div>
     
@@ -334,7 +334,7 @@
   <!-- ===== STEP 3: LAUNCH COMMAND ===== -->
   <div id="step-3" class="wizard-step">
     <div class="step-header">
-      <h3> Launch Pipeline</h3>
+      <h3>Launch Pipeline</h3>
       <div class="step-number">3</div>
     </div>
     
@@ -359,12 +359,12 @@
     
     <div style="margin-top:1rem;">
       <button class="btn" onclick="generateLaunchCommand()">Generate Command</button>
-      <button class="btn btn-secondary" onclick="downloadLaunchCommand()"> Download command.txt</button>
-      <button class="btn btn-success" onclick="finishWizard()"> Finish & Download All</button>
+      <button class="btn btn-secondary" onclick="downloadLaunchCommand()">Download command.txt</button>
+      <button class="btn btn-success" onclick="finishWizard()">Finish & Download All</button>
     </div>
     
     <textarea id="launchOutput" placeholder="// Launch command will appear here..."></textarea>
-    <p class="hint"> Run this command in your terminal. You can edit before downloading.</p>
+    <p class="hint">Run this command in your terminal. You can edit before downloading.</p>
     
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -375,8 +375,30 @@
   </div>
 
   <script>
-    // State tracking to prevent wiping data on tab switches
+    // State tracking
     let stepInitialized = { 1: false, 2: false, 3: false };
+    let configDirty = false;
+    let isAutoFilling = false;
+
+    // ===== RESET LOGIC FOR SAMPLESHEET =====
+    function fullResetSamplesheet() {
+      stepInitialized[2] = false;
+      document.querySelector('#exp_table tbody').innerHTML = '';
+      document.querySelector('#ctrl_table tbody').innerHTML = '';
+      document.getElementById('samplesheetOutput').value = '';
+      document.getElementById('global_exp_name').value = '';
+      checkExperimentLock();
+    }
+
+    // ===== DIRTY FLAG & TEXTAREA CLEARING =====
+    function markConfigDirty() {
+      if (isAutoFilling) return;
+      configDirty = true;
+      const out = document.getElementById('configOutput');
+      out.value = '';
+      out.placeholder = 'Configuration changed. Click "Generate nextflow.config" to update.';
+      document.getElementById('configHint').textContent = 'Form modified. Please regenerate before downloading.';
+    }
 
     // ===== WIZARD NAVIGATION =====
     function goToStep(stepNum) {
@@ -386,7 +408,6 @@
       document.getElementById(`step-${stepNum}`).classList.add('active');
       document.getElementById(`prog-${stepNum}`).classList.add('active');
 
-      // Only initialize on first visit to prevent wiping data
       if (!stepInitialized[stepNum]) {
         if (stepNum === 1) autoFillConfig();
         if (stepNum === 2) setupSamplesheetUI();
@@ -404,6 +425,9 @@
       const otaOptions = document.getElementById('ota_options');
       const splitContainer = document.getElementById('split_container');
       const datatypeContainer = document.getElementById('datatype_container');
+      const mapperLabel = document.getElementById('mapper_label_ota');
+      const mapperSelect = document.getElementById('config_mapper');
+      const ataMappers = document.getElementById('ata_mappers_container');
       
       methodContainer.style.display = group ? 'block' : 'none';
       ataOptions.style.display = group === 'ata' ? 'block' : 'none';
@@ -414,19 +438,29 @@
         methodSelect.innerHTML += `<option value="chirp">ChIRP-seq</option><option value="rap">RAP</option>`;
         splitContainer.style.display = 'flex';
         datatypeContainer.style.display = 'flex';
-        document.getElementById('split_hint').textContent = ' Only enable if your FASTQ files are already separated into RNA/DNA reads.';
-        document.getElementById('datatype_hint').textContent = ' Select your sequencing read type.';
+        document.getElementById('split_hint').textContent = 'Only enable if your FASTQ files are already separated into RNA/DNA reads.';
+        document.getElementById('datatype_hint').textContent = 'Select your sequencing read type.';
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
         document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = false);
+        
+        mapperLabel.style.display = 'block';
+        mapperSelect.style.display = 'block';
+        ataMappers.style.display = 'none';
       } else if (group === 'ata') {
         methodSelect.innerHTML += `
           <option value="redc">Red-C / Red-ChIP</option>
-          <option value="imargi">MARGI / iMARGI</option>
+          <option value="margi">MARGI</option>
+          <option value="imargi">iMARGI</option>
           <option value="grid">GRID-seq</option>
           <option value="char">ChAR-seq</option>
           <option value="radicl">RADICL-seq</option>
         `;
         updateAtaOptions();
+        
+        mapperLabel.style.display = 'none';
+        mapperSelect.style.display = 'none';
+        ataMappers.style.display = 'block';
+        updateIndexVisibility();
       }
     }
 
@@ -441,70 +475,110 @@
       if (method === 'redc') chromatinRadios[0].checked = true;
       else chromatinRadios[1].checked = true;
       
-      if (method === 'imargi') {
+      if (method === 'imargi' || method === 'margi') {
         splitContainer.style.display = 'none';
         document.querySelector('input[name="split_rna_dna"][value="no"]').checked = true;
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = true);
-        splitHint.textContent = ' MARGI/iMARGI: RNA-DNA separation is handled internally (unsplit).';
+        splitHint.textContent = 'MARGI/iMARGI: RNA-DNA separation is handled internally (unsplit).';
         
         datatypeContainer.style.display = 'none';
         document.querySelector('input[name="data_type"][value="pe"]').checked = true;
         document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = true);
-        datatypeHint.textContent = ' MARGI/iMARGI: Always paired-end sequencing.';
+        datatypeHint.textContent = 'MARGI/iMARGI: Always paired-end sequencing.';
       } else {
         splitContainer.style.display = 'flex';
         datatypeContainer.style.display = 'flex';
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
         document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = false);
-        splitHint.textContent = ' Only enable if your FASTQ files are already separated into RNA/DNA reads.';
-        datatypeHint.textContent = ' Select your sequencing read type.';
+        splitHint.textContent = 'Only enable if your FASTQ files are already separated into RNA/DNA reads.';
+        datatypeHint.textContent = 'Select your sequencing read type.';
       }
       
-      toggleRnaseqOption();
-      document.querySelectorAll('input[name="chromatin_potential"]').forEach(r => r.onchange = toggleRnaseqOption);
+      document.querySelectorAll('input[name="chromatin_potential"]').forEach(r => r.onchange = () => {});
     }
 
-    function toggleRnaseqOption() {
-      document.getElementById('rnaseq_option').style.display = document.querySelector('input[name="chromatin_potential"][value="yes"]').checked ? 'block' : 'none';
+    // Auto-fill bridge fields based on experiment method
+    function updateBridgeFields() {
+      const method = document.getElementById('exp_method').value;
+      const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
+      
+      if (method === 'imargi' || method === 'margi') {
+        const p = bridgePresets[method];
+        document.getElementById('config_bridge_fwd').value = p.fwd;
+        document.getElementById('config_bridge_rev').value = p.rev;
+        document.getElementById('config_debridge_tool').value = p.debridge;
+      } else if (['grid', 'char'].includes(method)) {
+        const key = split === 'yes' ? 'split' : 'unsplit';
+        const p = bridgePresets[method][key];
+        document.getElementById('config_bridge_fwd').value = p.fwd || '';
+        document.getElementById('config_bridge_rev').value = p.rev || '';
+        if (p.debridge) document.getElementById('config_debridge_tool').value = p.debridge;
+      } else if (method === 'redc' || method === 'radicl') {
+        const bridgeMap = { 
+          'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT', deb: 'bitap' }, 
+          'radicl': { f: 'AGCT', r: 'TCGA', deb: 'bitap' } 
+        };
+        if (bridgeMap[method]) {
+          document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
+          document.getElementById('config_bridge_rev').value = bridgeMap[method].r;
+          document.getElementById('config_debridge_tool').value = bridgeMap[method].deb;
+        }
+      } else {
+        document.getElementById('config_bridge_fwd').value = '';
+        document.getElementById('config_bridge_rev').value = '';
+      }
+    }
+
+    // Show single or dual index fields based on mapper selection (ATA only)
+    function updateIndexVisibility() {
+      const rnaTool = document.getElementById('config_rna_align_tool').value;
+      const dnaTool = document.getElementById('config_dna_align_tool').value;
+      const singleContainer = document.getElementById('single_index_container');
+      const dualContainer = document.getElementById('dual_index_container');
+      
+      if (rnaTool === dnaTool) {
+        singleContainer.style.display = 'block';
+        dualContainer.style.display = 'none';
+        document.getElementById('config_rna_align_index').value = '';
+        document.getElementById('config_dna_align_index').value = '';
+      } else {
+        singleContainer.style.display = 'none';
+        dualContainer.style.display = 'block';
+        document.getElementById('config_shared_index').value = '';
+      }
     }
 
     // ===== STEP 2: SAMPLESHEET BUILDER =====
     let currentMode = {};
 
     function setupSamplesheetUI() {
-      if (stepInitialized[2]) return; // Prevent wiping existing data
+      if (stepInitialized[2]) return;
       
       const group = document.getElementById('exp_group').value;
       const method = document.getElementById('exp_method').value;
       const chromatin = document.querySelector('input[name="chromatin_potential"]:checked')?.value;
       const otaCtrl = document.querySelector('input[name="ota_control"]:checked')?.value;
       
-      const isMargi = method === 'margi' || method === 'imargi';
-      const split = isMargi ? 'no' : (document.querySelector('input[name="split_rna_dna"]:checked')?.value || 'no');
-      const dataType = isMargi ? 'pe' : (document.querySelector('input[name="data_type"]:checked')?.value || 'se');
-      
       document.getElementById('exp_form').innerHTML = '';
       document.getElementById('ctrl_form').innerHTML = '';
-      document.querySelector('#exp_table tbody').innerHTML = '';
-      document.querySelector('#ctrl_table tbody').innerHTML = '';
       document.getElementById('exp_header').innerHTML = '';
       document.getElementById('ctrl_header').innerHTML = '';
 
       if (group === 'ata') {
         if (chromatin === 'yes') {
-          currentMode = { header: 'sample,rna,dna,description', ctrlTitle: 'RNA-seq Control Samples', showCtrl: true };
-          document.getElementById('samplesheet_ref').value = `sample,rna,dna,description\nHFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"\nHFFc6_imargi_2,SRR8206680_1.fastq.gz,SRR8206680_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"\nrnaseq_HFFc6,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6"`;
+          currentMode = { header: 'sample,rna,dna,description', ctrlTitle: '🧬 RNA-seq Control Samples', showCtrl: true };
+          document.getElementById('samplesheet_ref').value = `sample,rna,dna,description\nHFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"\nrnaseq_HFFc6,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6"`;
           setupForm('exp', ['Sample', 'RNA FASTQ', 'DNA FASTQ', 'Description (e.g., tissue:"K562")']);
           setupForm('ctrl', ['Sample (start with rnaseq_)', 'RNA FASTQ', 'DNA FASTQ', 'Description']);
         } else {
           currentMode = { header: 'sample,rna,dna', ctrlTitle: '', showCtrl: false };
-          document.getElementById('samplesheet_ref').value = `sample,rna,dna\nHFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz\nHFFc6_imargi_2,SRR8206680_1.fastq.gz,SRR8206680_2.fastq.gz`;
+          document.getElementById('samplesheet_ref').value = `sample,rna,dna\nHFFc6_imargi_1,SRR8206679_1.fastq.gz,SRR8206679_2.fastq.gz`;
           setupForm('exp', ['Sample', 'RNA FASTQ', 'DNA FASTQ']);
           document.getElementById('ctrl_section').style.display = 'none';
         }
-      } else { // OTA
+      } else {
         if (otaCtrl === 'yes') {
-          currentMode = { header: 'sample,fastq_1,fastq_2,control,description', ctrlTitle: 'Input Control Samples', showCtrl: true };
+          currentMode = { header: 'sample,fastq_1,fastq_2,control,description', ctrlTitle: '🧪 Input Control Samples', showCtrl: true };
           document.getElementById('samplesheet_ref').value = `sample,fastq_1,fastq_2,control,description\nSCIRT_chart_39,SRR10044362.fastq.gz,,SCIRT_INPUT,tissue:"K562"\nSCIRT_INPUT,SRR10044359.fastq.gz,,`;
           setupForm('exp', ['Sample', 'FASTQ_1', 'FASTQ_2 (blank for SE)', 'Control Sample ID', 'Description']);
           setupForm('ctrl', ['Sample ID', 'FASTQ_1', 'FASTQ_2', 'Description']);
@@ -530,7 +604,7 @@
       const container = document.getElementById(`${prefix}_form`);
       container.innerHTML = '';
       labels.forEach((label, i) => {
-        if (i === 0) return; // Sample column handled globally
+        if (i === 0) return; 
         const div = document.createElement('div');
         div.innerHTML = `<input type="text" id="${prefix}_${i}" placeholder="${label}">`;
         container.appendChild(div);
@@ -542,7 +616,6 @@
       header.innerHTML = cols.map(c => `<th>${c}</th>`).join('') + '<th></th>';
     }
 
-    // ✅ CHANGE 4: Lock logic integrated
     function addRow(type) {
       const cols = currentMode.header.split(',');
       const expName = document.getElementById('global_exp_name').value.trim();
@@ -566,21 +639,20 @@
         const input = document.getElementById(`${type}_${i}`);
         if (input) input.value = '';
       }
-      
-      checkRnaSeqLock();
+      checkExperimentLock();
     }
 
     function removeRow(btn) {
       btn.closest('tr').remove();
-      checkRnaSeqLock();
+      checkExperimentLock();
     }
 
-    function checkRnaSeqLock() {
-      const hasRnaSeq = document.querySelectorAll('#ctrl_table tbody tr').length > 0;
+    function checkExperimentLock() {
+      const hasData = document.querySelector('#exp_table tbody tr, #ctrl_table tbody tr') !== null;
       const input = document.getElementById('global_exp_name');
       const warning = document.getElementById('exp_name_lock_warning');
       
-      if (hasRnaSeq) {
+      if (hasData) {
         input.disabled = true;
         input.style.background = '#e9ecef';
         warning.style.display = 'block';
@@ -596,7 +668,7 @@
         document.querySelector('#exp_table tbody').innerHTML = '';
         if(currentMode.showCtrl) document.querySelector('#ctrl_table tbody').innerHTML = '';
         document.getElementById('samplesheetOutput').value = '';
-        checkRnaSeqLock();
+        checkExperimentLock();
       }
     }
 
@@ -613,10 +685,7 @@
 
       expData.forEach(row => {
         let mapped = [];
-        cols.forEach(col => {
-          const idx = cols.indexOf(col);
-          mapped.push(row[idx] || '');
-        });
+        cols.forEach(col => { mapped.push(row[cols.indexOf(col)] || ''); });
         csv += mapped.join(',') + '\n';
       });
 
@@ -627,8 +696,7 @@
             if (col === 'control') mapped.push('');
             else {
               const ctrlCols = cols.filter(c => c !== 'control');
-              const cIdx = ctrlCols.indexOf(col);
-              mapped.push(row[cIdx] || '');
+              mapped.push(row[ctrlCols.indexOf(col)] || '');
             }
           });
           csv += mapped.join(',') + '\n';
@@ -647,20 +715,36 @@
     }
 
     // ===== STEP 3: CONFIG GENERATOR (LOGIC) =====
-    const mapperDefaults = {
-      hisat2: { rna: '--no-softclip --dta-cufflinks -k 100', dna: '--no-softclip -k 100 --no-spliced-alignment' },
-      bwa_mem: { rna: '-k 17 -T 17', dna: '-k 17 -T 17' },
-      bwa_aln: { rna: '-n 0.04 -l 32 -t 4', dna: '-n 0.04 -l 32 -t 4' },
-      bowtie2: { rna: '--very-sensitive --no-unal -p 4', dna: '--very-sensitive --no-unal -p 4' },
-      star: { rna: '--outFilterMultimapNmax 100 --alignSJoverhangMin 8 --runThreadN 4', dna: '--alignEndsType EndToEnd --chimSegmentMin 15 --runThreadN 4' }
-    };
-
+    
     const bridgePresets = {
-      grid: { unsplit: { dna_part: '*s[AG|AGCT]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'GTTCGGTGTGTG', rev: 'CACACACCGAAC', max_mm: 1, min_len: 14 }, split: { dna_part: '*', rna_part: '.', bridge_proc: false } },
+      grid: {
+        unsplit: { dna_part: '*s[AG|AGCT]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'GTTCGGTGTGTG', rev: 'CACACACCGAAC', max_mm: 1, min_len: 14 },
+        split: { dna_part: '*', rna_part: '.', bridge_proc: false }
+      },
       imargi: { dna_part: '*', rna_part: '-[2].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
       margi: { dna_part: '*', rna_part: '-[2].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
-      char: { unsplit: { dna_part: '*s[GATC|GATC]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'CTTGGACGCCGGTTTTTTT', rev: 'AAAAAAACCGGCGTCCAAG', max_mm: 1, min_len: 14 }, split: { dna_part: '*', rna_part: '.', bridge_proc: false } },
+      char: {
+        unsplit: { dna_part: '*s[GATC|GATC]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'CTTGGACGCCGGTTTTTTT', rev: 'AAAAAAACCGGCGTCCAAG', max_mm: 1, min_len: 14 },
+        split: { dna_part: '*', rna_part: '.', bridge_proc: false }
+      },
       ota: { bridge_proc: false }
+    };
+
+    const mapperDefaults = {
+      hisat2: { 
+        rna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --dta --no-temp-splicesite', 
+        dna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --no-spliced-alignment' 
+      },
+      bwa_mem: { rna: '-Y -a -k 17 -T 1', dna: '-Y -a -k 18 -T 1' },
+      bwa_aln: { rna: '', dna: '' },
+      bowtie2: { 
+        rna: '--end-to-end -k 10 --no-1mm-upfront -D 15 -R 2 -i S,1,0.50 -N 0 -L 19 --score-min L,-0.6,-0.6', 
+        dna: '--end-to-end -k 10 --no-1mm-upfront -D 15 -R 2 -i S,1,1.15 -N 0 -L 19 --score-min L,-0.6,-0.6' 
+      },
+      star: { 
+        rna: '--outSAMtype BAM Unsorted --outSAMstrandField None --outSAMattributes NM --outSAMunmapped Within --outSAMmultNmax 10 --outFilterMultimapNmax 100 --outReadsUnmapped None --outMultimapperOrder Old_2.4 --alignIntronMin 20 --alignEndsType EndToEnd --outFilterScoreMinOverLread 0.66', 
+        dna: '--outSAMtype BAM Unsorted --outSAMstrandField None --outSAMattributes NM --outSAMunmapped Within --outSAMmultNmax 10 --outFilterMultimapNmax 100 --outReadsUnmapped None --outMultimapperOrder Old_2.4 --alignIntronMin 20 --alignEndsType EndToEnd --outFilterScoreMinOverLread 0.66 --alignIntronMax 19' 
+      }
     };
 
     const toolOptionDefaults = {
@@ -679,67 +763,21 @@
       
       if (method === 'imargi' || method === 'margi') {
         const allowed = ['bwa_mem', 'star'];
-        ['config_rna_align_tool', 'config_dna_align_tool', 'config_mapper'].forEach(id => {
+        ['config_rna_align_tool', 'config_dna_align_tool'].forEach(id => {
           const select = document.getElementById(id);
-          Array.from(select.options).forEach(opt => opt.disabled = !allowed.includes(opt.value));
-          if (!allowed.includes(select.value)) select.value = 'bwa_mem';
+          if(select) Array.from(select.options).forEach(opt => opt.disabled = !allowed.includes(opt.value));
+          if(select && !allowed.includes(select.value)) select.value = 'bwa_mem';
         });
       }
-      updateAlignIndexFields();
     }
 
-    function updateAlignIndexFields() {
-      const group = document.getElementById('exp_group').value;
-      document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
-    }
-
-    // 🔧 FIX: Logic corrected to handle initial state properly
-    function toggleSeparateMappers() {
-      const checked = document.getElementById('use_separate_mappers').checked;
-      document.getElementById('rna_sep_container').style.display = checked ? 'block' : 'none';
-      document.getElementById('dna_sep_container').style.display = checked ? 'block' : 'none';
-      document.getElementById('rna_index_field').style.display = checked ? 'block' : 'none';
-      document.getElementById('dna_index_field').style.display = checked ? 'block' : 'none';
-    }
-
-    function updateDedupOptions() {
-      document.getElementById('config_dedup_opts').value = toolOptionDefaults.dedup[document.getElementById('config_dedup_tool').value] || '';
-    }
-    function updateTrimOptions() {
-      document.getElementById('config_trim_opts').value = toolOptionDefaults.trim[document.getElementById('config_trim_tool').value] || '';
-    }
-    function updateMergeOptions() {
-      document.getElementById('config_merge_opts').value = toolOptionDefaults.merge[document.getElementById('config_merge_tool').value] || '';
-    }
-
-    function updateBridgePreview() {
-      const group = document.getElementById('exp_group').value;
-      const method = document.getElementById('exp_method').value;
-      const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
-      const preview = document.getElementById('bridge_preview');
-      let html = '<strong>🔗 Bridge/Restriction Settings Preview:</strong><br>';
-      
-      if (group === 'ota') {
-        html += `<code style="color:#666">// BRIDGE SEARCH: --------------------------------------------------------------------------------<br>bridge_processing = false<br>// ...</code>`;
-      } else if (method === 'imargi' || method === 'margi') {
-        const p = bridgePresets[method];
-        html += `<code>// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------<br>dna_part_processing = "${p.dna_part}"<br>rna_part_processing = "${p.rna_part}"<br>bridge_processing = false<br>// ...</code>`;
-      } else if (['grid', 'char'].includes(method)) {
-        const key = split === 'yes' ? 'split' : 'unsplit';
-        const p = bridgePresets[method][key];
-        html += `<code>// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------<br>dna_part_processing = "${p.dna_part}"<br>rna_part_processing = "${p.rna_part}"<br>bridge_processing = ${p.bridge_proc}<br>${p.bridge_proc ? `debridge_tool = "${p.debridge}"\nforward_bridge_seq = "${p.fwd}"\nreverse_bridge_seq = "${p.rev}"` : '// ...'}</code>`;
-      } else {
-        html += `<code>// Bridge settings auto-filled by experiment method.<br>// Edit fields below to customize.</code>`;
-      }
-      preview.innerHTML = html;
-    }
+    function updateDedupOptions() { document.getElementById('config_dedup_opts').value = toolOptionDefaults.dedup[document.getElementById('config_dedup_tool').value] || ''; }
+    function updateTrimOptions() { document.getElementById('config_trim_opts').value = toolOptionDefaults.trim[document.getElementById('config_trim_tool').value] || ''; }
+    function updateMergeOptions() { document.getElementById('config_merge_opts').value = toolOptionDefaults.merge[document.getElementById('config_merge_tool').value] || ''; }
 
     function autoFillConfig() {
-      if (stepInitialized[1] && stepInitialized[3]) {
-        updateConfigSummaryOnly();
-        return;
-      }
-
+      isAutoFilling = true;
+      
       const method = document.getElementById('exp_method').value;
       const group = document.getElementById('exp_group').value;
       const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
@@ -747,93 +785,88 @@
       document.getElementById('config_exp_summary').textContent = `${group.toUpperCase()} / ${method.toUpperCase()}`;
       document.getElementById('config_data_summary').textContent = document.querySelector('input[name="data_type"]:checked')?.value === 'pe' ? 'Paired-end' : 'Single-end';
       document.getElementById('config_chromatin_summary').textContent = document.querySelector('input[name="chromatin_potential"]:checked')?.value === 'yes' ? 'Enabled' : 'Disabled';
-      document.getElementById('config_rnaseq_summary').textContent = (group === 'ata' && document.querySelector('input[name="include_rnaseq"]:checked')?.value === 'yes') || (group === 'ota' && document.querySelector('input[name="ota_control"]:checked')?.value === 'yes') ? 'Yes' : 'No';
+      document.getElementById('config_rnaseq_summary').textContent = 'N/A';
       
-      if (group === 'ota') {
-        document.getElementById('config_bridge_fwd').value = '';
-        document.getElementById('config_bridge_rev').value = '';
-      } else if (method === 'imargi' || method === 'margi') {
-        const p = bridgePresets[method];
-        document.getElementById('config_bridge_fwd').value = p.fwd;
-        document.getElementById('config_bridge_rev').value = p.rev;
-      } else if (['grid', 'char'].includes(method)) {
-        const key = split === 'yes' ? 'split' : 'unsplit';
-        const p = bridgePresets[method][key];
-        document.getElementById('config_bridge_fwd').value = p.fwd || '';
-        document.getElementById('config_bridge_rev').value = p.rev || '';
-      } else {
-        const bridgeMap = { 'redc': { f: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', r: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT' }, 'radicl': { f: 'AGCT', r: 'TCGA' } };
-        if (bridgeMap[method]) {
-          document.getElementById('config_bridge_fwd').value = bridgeMap[method].f;
-          document.getElementById('config_bridge_rev').value = bridgeMap[method].r;
-        }
-      }
+      updateBridgeFields();
       
       updateMapperOptions();
-      updateBridgePreview();
-      document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
+      if (group === 'ata') {
+        document.getElementById('ata_mappers_container').style.display = 'block';
+        updateIndexVisibility();
+      } else {
+        document.getElementById('ata_mappers_container').style.display = 'none';
+      }
+      
       updateDedupOptions(); updateTrimOptions(); updateMergeOptions();
-      document.getElementById('use_separate_mappers').checked = false;
-      toggleSeparateMappers();
-
+      
+      document.getElementById('advanced_config').style.display = 'none';
+      document.getElementById('toggleAdvBtn').textContent = 'Show Advanced Options';
+      
+      configDirty = true;
+      const out = document.getElementById('configOutput');
+      out.value = '';
+      out.placeholder = 'Fields auto-filled. Please click "Generate nextflow.config" to populate.';
+      
+      isAutoFilling = false;
       stepInitialized[1] = true;
-      stepInitialized[3] = true;
     }
 
-    function updateConfigSummaryOnly() {
-      const group = document.getElementById('exp_group').value || 'N/A';
-      const method = document.getElementById('exp_method').value || 'N/A';
-      const dataType = document.querySelector('input[name="data_type"]:checked')?.value || 'se';
-      const chromatin = document.querySelector('input[name="chromatin_potential"]:checked')?.value || 'no';
-      const rnaseq = document.querySelector('input[name="include_rnaseq"]:checked')?.value || 
-                     document.querySelector('input[name="ota_control"]:checked')?.value || 'no';
+    function toggleGenomeInput() {}
 
-      document.getElementById('config_exp_summary').textContent = `${group.toUpperCase()} / ${method.toUpperCase()}`;
-      document.getElementById('config_data_summary').textContent = dataType === 'pe' ? 'Paired-end' : 'Single-end';
-      document.getElementById('config_chromatin_summary').textContent = chromatin === 'yes' ? 'Enabled' : 'Disabled';
-      document.getElementById('config_rnaseq_summary').textContent = rnaseq === 'yes' ? 'Yes' : 'No';
-    }
-
-    function toggleGenomeInput() {
-      document.getElementById('config_genome_name').style.display = document.getElementById('config_genome_mode').value === 'name' ? 'block' : 'none';
-      document.getElementById('config_genome_fasta').style.display = document.getElementById('config_genome_mode').value === 'fasta' ? 'block' : 'none';
-    }
-
-    // 🔧 FIX: Toggle button cycle corrected
     function toggleAdvancedConfig() {
       const adv = document.getElementById('advanced_config');
       const btn = document.getElementById('toggleAdvBtn');
-      // Check both 'none' and empty string (default before JS touches it)
       const isHidden = adv.style.display === 'none' || adv.style.display === '';
-      
       adv.style.display = isHidden ? 'block' : 'none';
       btn.textContent = isHidden ? 'Hide Advanced Options' : 'Show Advanced Options';
-      
       if (isHidden) {
-        updateBridgePreview();
         const group = document.getElementById('exp_group').value;
-        document.getElementById('ata_mapper_options').style.display = group === 'ata' ? 'block' : 'none';
-        updateAlignIndexFields();
-        toggleSeparateMappers();
+        if (group === 'ata') {
+          document.getElementById('ata_mappers_container').style.display = 'block';
+          updateIndexVisibility();
+        }
       }
     }
 
     function generateConfig() {
-      const method = document.getElementById('exp_method').value;
+      const required = ['config_genome_fasta', 'config_annot_bed', 'config_annot_gtf', 'detect_strand_genes_list'];
+      const missing = required.filter(id => !document.getElementById(id).value.trim());
+      
+      if (missing.length > 0) {
+        alert('Please fill all required fields marked with * before generating config.');
+        return;
+      }
+
       const group = document.getElementById('exp_group').value;
+      const method = document.getElementById('exp_method').value;
+      
+      if (group === 'ata') {
+        const rnaTool = document.getElementById('config_rna_align_tool').value;
+        const dnaTool = document.getElementById('config_dna_align_tool').value;
+        
+        if (rnaTool === dnaTool) {
+          if (!document.getElementById('config_shared_index').value.trim()) {
+            alert('ATA experiments with same RNA/DNA mapper require an index path.');
+            return;
+          }
+        } else {
+          const ataMissing = ['config_rna_align_index', 'config_dna_align_index'].filter(id => !document.getElementById(id).value.trim());
+          if (ataMissing.length > 0) {
+            alert('ATA experiments with different RNA/DNA mappers require both index paths.');
+            return;
+          }
+        }
+      }
+
       const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
-      const genomeMode = document.getElementById('config_genome_mode').value;
-      const genomeVal = genomeMode === 'name' ? (document.getElementById('config_genome_name').value.trim() || 'GRCh38') : document.getElementById('config_genome_fasta').value.trim();
+      const genomePath = document.getElementById('config_genome_fasta').value.trim();
       const annotBed = document.getElementById('config_annot_bed').value.trim();
       const annotGtf = document.getElementById('config_annot_gtf').value.trim();
-      const showAdv = document.getElementById('advanced_config').style.display !== 'none';
+      const detectGenes = document.getElementById('detect_strand_genes_list').value.trim();
       
-      const fwd = document.getElementById('config_bridge_fwd').value.trim() || 'AGCT';
-      const rev = document.getElementById('config_bridge_rev').value.trim() || 'TCGA';
-      const mapper = document.getElementById('config_mapper').value;
+      const mapper = group === 'ata' ? document.getElementById('config_rna_align_tool').value : document.getElementById('config_mapper').value;
       const rnaOpts = document.getElementById('config_rna_align_opts').value.trim();
       const dnaOpts = document.getElementById('config_dna_align_opts').value.trim();
-      
       const dedupTool = document.getElementById('config_dedup_tool').value;
       const dedupOpts = document.getElementById('config_dedup_opts').value.trim();
       const trimTool = document.getElementById('config_trim_tool').value;
@@ -841,59 +874,78 @@
       const mergeTool = document.getElementById('config_merge_tool').value;
       const mergeOpts = document.getElementById('config_merge_opts').value.trim();
       
-      const useSeparate = document.getElementById('use_separate_mappers').checked;
-      const rnaAlignTool = useSeparate ? document.getElementById('config_rna_align_tool').value : mapper;
-      const dnaAlignTool = useSeparate ? document.getElementById('config_dna_align_tool').value : mapper;
-      
-      const generalIndex = document.getElementById('config_genome_index').value.trim();
-      const rnaIndex = useSeparate ? document.getElementById('config_rna_align_index').value.trim() : '';
-      const dnaIndex = useSeparate ? document.getElementById('config_dna_align_index').value.trim() : '';
-      
+      const showAdv = document.getElementById('advanced_config').style.display !== 'none';
+      const genomeIdx = document.getElementById('config_genome_index').value.trim();
+      const fwd = document.getElementById('config_bridge_fwd').value.trim() || 'AGCT';
+      const rev = document.getElementById('config_bridge_rev').value.trim() || 'TCGA';
+      const debridge = document.getElementById('config_debridge_tool').value;
+      const maxMem = document.getElementById('config_max_memory').value;
+      const maxCpus = document.getElementById('config_max_cpus').value;
+
       let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
       cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\n`;
       cfg += `dedup_tool = "${dedupTool}"\ntrim_tool = "${trimTool}"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = '${mergeTool}'\n`;
       
-      if (group === 'ata') {
-        if (useSeparate) {
-          cfg += `rna_align_tool = '${rnaAlignTool}'\ndna_align_tool = '${dnaAlignTool}'\n`;
-          if (rnaIndex) cfg += `${rnaAlignTool}_index = '${rnaIndex}'\n`;
-          if (dnaIndex) cfg += `${dnaAlignTool}_index = '${dnaIndex}'\n`;
-        } else if (generalIndex) cfg += `${mapper}_index = '${generalIndex}'\n`;
-      } else if (generalIndex) cfg += `${mapper}_index = '${generalIndex}'\n`;
+      cfg += `genome_fasta = '${genomePath}'\n`;
+      cfg += `detect_strand_genes_list = '${detectGenes}'\n`;
       
-      cfg += genomeMode === 'name' ? `genome = '${genomeVal}'\n` : `genome_fasta = '${genomeVal}'\n`;
-      cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
+      if (group === 'ata') {
+        const rnaTool = document.getElementById('config_rna_align_tool').value;
+        const dnaTool = document.getElementById('config_dna_align_tool').value;
+        cfg += `rna_align_tool = '${rnaTool}'\ndna_align_tool = '${dnaTool}'\n`;
+        
+        if (rnaTool === dnaTool) {
+          const sharedIdx = document.getElementById('config_shared_index').value.trim();
+          if (sharedIdx) cfg += `${rnaTool}_index = '${sharedIdx}'\n`;
+        } else {
+          const rnaIdx = document.getElementById('config_rna_align_index').value.trim();
+          const dnaIdx = document.getElementById('config_dna_align_index').value.trim();
+          if (rnaIdx) cfg += `${rnaTool}_index = '${rnaIdx}'\n`;
+          if (dnaIdx) cfg += `${dnaTool}_index = '${dnaIdx}'\n`;
+        }
+      } else if (genomeIdx) {
+        cfg += `${mapper}_index = '${genomeIdx}'\n`;
+      }
+      
+      cfg += `stages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       
       if (group === 'ota') {
         cfg += `// BRIDGE SEARCH: --------------------------------------------------------------------------------\nbridge_processing = false\n// ...\n`;
       } else if (method === 'imargi' || method === 'margi') {
         const p = bridgePresets[method];
-        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\ndna_part_processing = "${p.dna_part}"\nrna_part_processing = "${p.rna_part}"\nbridge_processing = false\ndescription_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
+        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\ndna_part_processing = "${p.dna_part}"\nrna_part_processing = "${p.rna_part}"\nbridge_processing = false\ndebridge_tool = "${debridge}"\ndescription_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
       } else if (['grid', 'char'].includes(method)) {
         const key = split === 'yes' ? 'split' : 'unsplit';
         const p = bridgePresets[method][key];
         cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\ndna_part_processing = "${p.dna_part}"\nrna_part_processing = "${p.rna_part}"\nbridge_processing = ${p.bridge_proc}\n`;
-        if (p.bridge_proc) cfg += `debridge_tool = "${p.debridge}"\nforward_bridge_seq = "${p.fwd}"\nreverse_bridge_seq = "${p.rev}"\nmax_mismatches = ${p.max_mm}\nmin_rna_dna_parts_length = ${p.min_len}\n`;
+        if (p.bridge_proc) cfg += `debridge_tool = "${debridge}"\nforward_bridge_seq = "${p.fwd}"\nreverse_bridge_seq = "${p.rev}"\nmax_mismatches = ${p.max_mm}\nmin_rna_dna_parts_length = ${p.min_len}\n`;
         cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
       } else {
-        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\nbridge_processing = true\ndebridge_tool = "bitap"\nforward_bridge_seq = "${fwd}"\nreverse_bridge_seq = "${rev}"\ndna_part_processing = "*"\nrna_part_processing = "."\nmax_mismatches = 1\nmin_rna_dna_parts_length = 14\n`;
+        cfg += `// RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------\nbridge_processing = true\ndebridge_tool = "${debridge}"\nforward_bridge_seq = "${fwd}"\nreverse_bridge_seq = "${rev}"\ndna_part_processing = "*"\nrna_part_processing = "."\nmax_mismatches = 1\nmin_rna_dna_parts_length = 14\n`;
         cfg += `description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""\n`;
       }
       
-      cfg += showAdv ? `max_memory = '${document.getElementById('config_max_memory').value}'\nmax_cpus = ${document.getElementById('config_max_cpus').value}\n` : `max_memory = '128.GB'\nmax_cpus = 16\n`;
+      cfg += showAdv ? `max_memory = '${maxMem}'\nmax_cpus = ${maxCpus}\n` : `max_memory = '128.GB'\nmax_cpus = 16\n`;
       cfg += `publish_dir_mode = 'copy'\n}\n\nprocess {\nwithName: '.*' {\n  cpus = 2\n  memory = 10.GB\n}\n}\n\nflags = [\n  fastq_dupaway: "${dedupOpts}",\n  fastp: "${trimOpts}",\n  pear: "${mergeOpts}",\n  rna_align_options: "${rnaOpts}",\n  dna_align_options: "${dnaOpts}"\n]\n`;
+      
       document.getElementById('configOutput').value = cfg;
+      configDirty = false;
+      document.getElementById('configHint').textContent = 'Config up to date. You can edit the text above.';
     }
 
     function downloadConfig() {
+      if (configDirty) {
+        if (!confirm('You have unsaved changes in the form. The current text box may be outdated.\n\nDo you want to download the current text box content anyway?')) {
+          return;
+        }
+      }
       const cfg = document.getElementById('configOutput').value;
-      if (!cfg) return alert('Generate the config first.');
+      if (!cfg) return alert('Please generate the config first.');
       const blob = new Blob([cfg], { type: 'text/plain' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nextflow.config';
       document.body.appendChild(a); a.click(); a.remove();
     }
 
-    // ===== FILE UPLOAD =====
     document.getElementById('configUpload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -907,15 +959,18 @@
     });
 
     function autoFillFormFromConfig(configText) {
+      isAutoFilling = true;
       const extract = (key) => { const regex = new RegExp(`^\\s*${key}\\s*=\\s*['"]([^'"]*)['"]`, 'm'); const match = configText.match(regex); return match ? match[1].trim() : null; };
       try {
         const mapper = extract('align_tool'); if (mapper && ['hisat2','bwa_mem','bwa_aln','bowtie2','star'].includes(mapper)) document.getElementById('config_mapper').value = mapper;
         const fwd = extract('forward_bridge_seq'); if (fwd) document.getElementById('config_bridge_fwd').value = fwd;
         const rev = extract('reverse_bridge_seq'); if (rev) document.getElementById('config_bridge_rev').value = rev;
-        const genome = extract('genome'); if (genome) { document.getElementById('config_genome_name').value = genome; document.getElementById('config_genome_mode').value = 'name'; }
-        updateMapperOptions(); toggleGenomeInput(); updateBridgePreview();
-        alert(' Config loaded successfully!');
-      } catch (e) { alert(' Config loaded into text box.\n\n Auto-fill encountered an issue. You can still edit and use it directly.'); }
+        const genome = extract('genome_fasta') || extract('genome'); if (genome) document.getElementById('config_genome_fasta').value = genome;
+        updateMapperOptions();
+        configDirty = false;
+        alert('Config loaded and parsed successfully!');
+      } catch (e) { alert('Config loaded into text box.\n\n Auto-fill encountered an issue. You can still edit and use it directly.'); }
+      isAutoFilling = false;
     }
 
     function autoFillLaunchCommand() {
@@ -940,12 +995,11 @@
     }
 
     function finishWizard() {
-      alert(" Setup complete!\n\nFiles ready for download:\n• samplesheet.csv\n• nextflow.config\n• command.txt\n\nRun the command in your terminal to start the pipeline.");
+      alert("✅ Setup complete!\n\nFiles ready for download:\n• samplesheet.csv\n• nextflow.config\n• command.txt\n\nRun the command in your terminal to start the pipeline.");
     }
 
     window.addEventListener('load', () => {
-      toggleGenomeInput();
-      document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => { r.onchange = () => { if (document.getElementById('advanced_config').style.display !== 'none') updateBridgePreview(); }; });
+      document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => { r.onchange = () => { if (document.getElementById('advanced_config').style.display !== 'none') updateBridgeFields(); }; });
     });
   </script>
 </body>
