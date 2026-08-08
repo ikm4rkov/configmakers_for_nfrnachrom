@@ -75,10 +75,11 @@
     <label class="req">Experiment Group</label>
     <select id="exp_group" onchange="updateMethodOptions(); fullResetSamplesheet();">
       <option value="">— Select group —</option>
-      <option value="ota">One-to-All (OTA)</option>
-      <option value="ata">All-to-All (ATA)</option>
+      <option value="ota">One-to-all (OTA)</option>
+      <option value="ata">All-to-all (ATA)</option>
     </select>
     
+    <!-- RESTORED: Experiment Method Subsection -->
     <div id="method_container" style="display:none;">
       <label class="req">Experiment Method</label>
       <select id="exp_method" onchange="updateAtaOptions(); fullResetSamplesheet(); updateBridgeFields();">
@@ -101,6 +102,7 @@
         <label><input type="radio" name="split_rna_dna" value="no" checked> No</label>
       </div>
       <p class="hint" id="split_hint">Only enable if your FASTQ files are already separated into RNA/DNA reads.</p>
+      
     </div>
 
     <!-- OTA-specific options -->
@@ -184,13 +186,13 @@
       </div>
     </div>
     
-    <p class="hint">For ATA experiments, separate RNA/DNA mappers & indices are required above.</p>
+    <p class="hint">💡 For ATA experiments, separate RNA/DNA mappers & indices are required above.</p>
     
     <button class="btn btn-secondary" id="toggleAdvBtn" onclick="toggleAdvancedConfig()" style="margin:0.5rem 0;">Show Advanced Options</button>
     
     <div id="advanced_config" style="display:none;">
-      <!-- BRIDGE ORIENTATION HINT -->
-      <p class="bridge-hint">Bridge sequence determined as: <code>5'-DNA part - forward bridge - RNA part-3'</code></p>
+      <!-- REPLACED PREVIEW BOX WITH SIMPLE HINT -->
+      <p class="bridge-hint">💡 Bridge sequence determined as: <code>5'-DNA part - forward bridge - RNA part-3'</code></p>
       
       <label>Forward bridge sequence <span class="default-badge">auto-filled by method</span></label>
       <input type="text" id="config_bridge_fwd" placeholder="e.g., AGCT or custom sequence" oninput="markConfigDirty()">
@@ -198,11 +200,11 @@
       <label>Reverse bridge sequence</label>
       <input type="text" id="config_bridge_rev" placeholder="e.g., TCGA or custom sequence" oninput="markConfigDirty()">
       
-      <!-- Debridge Tool Dropdown -->
+      <!-- NEW: Debridge Tool Dropdown -->
       <label>De-bridge Tool</label>
       <select id="config_debridge_tool" onchange="markConfigDirty()">
         <option value="bitap" selected>bitap (default, recommended)</option>
-        <option value="chartools">chartools (not thoroughly tested)</option>
+        <option value="chartools">chartools)</option>
       </select>
       
       <label>Genome Index Path (Optional)</label>
@@ -387,7 +389,7 @@
       document.querySelector('#ctrl_table tbody').innerHTML = '';
       document.getElementById('samplesheetOutput').value = '';
       document.getElementById('global_exp_name').value = '';
-      checkExperimentLock();
+      checkExperimentLock(); // Unlocks and hides warning
     }
 
     // ===== DIRTY FLAG & TEXTAREA CLEARING =====
@@ -408,6 +410,7 @@
       document.getElementById(`step-${stepNum}`).classList.add('active');
       document.getElementById(`prog-${stepNum}`).classList.add('active');
 
+      // Only initialize on first visit to prevent wiping data
       if (!stepInitialized[stepNum]) {
         if (stepNum === 1) autoFillConfig();
         if (stepNum === 2) setupSamplesheetUI();
@@ -434,6 +437,7 @@
       otaOptions.style.display = group === 'ota' ? 'block' : 'none';
       methodSelect.innerHTML = '<option value="">— Select method —</option>';
       
+      // Toggle mapper visibility based on group
       if (group === 'ota') {
         methodSelect.innerHTML += `<option value="chirp">ChIRP-seq</option><option value="rap">RAP</option>`;
         splitContainer.style.display = 'flex';
@@ -443,6 +447,7 @@
         document.querySelectorAll('input[name="split_rna_dna"]').forEach(r => r.disabled = false);
         document.querySelectorAll('input[name="data_type"]').forEach(r => r.disabled = false);
         
+        // Show single mapper, hide ATA mappers
         mapperLabel.style.display = 'block';
         mapperSelect.style.display = 'block';
         ataMappers.style.display = 'none';
@@ -450,17 +455,17 @@
         methodSelect.innerHTML += `
           <option value="redc">Red-C / Red-ChIP</option>
           <option value="margi">MARGI</option>
-          <option value="imargi">iMARGI</option>
           <option value="grid">GRID-seq</option>
           <option value="char">ChAR-seq</option>
           <option value="radicl">RADICL-seq</option>
         `;
         updateAtaOptions();
         
+        // Hide single mapper, show ATA mappers
         mapperLabel.style.display = 'none';
         mapperSelect.style.display = 'none';
         ataMappers.style.display = 'block';
-        updateIndexVisibility();
+        updateIndexVisibility(); // Initialize index visibility
       }
     }
 
@@ -494,10 +499,15 @@
         datatypeHint.textContent = 'Select your sequencing read type.';
       }
       
-      document.querySelectorAll('input[name="chromatin_potential"]').forEach(r => r.onchange = () => {});
+      toggleRnaseqOption();
+      document.querySelectorAll('input[name="chromatin_potential"]').forEach(r => r.onchange = toggleRnaseqOption);
     }
 
-    // Auto-fill bridge fields based on experiment method
+    function toggleRnaseqOption() {
+      document.getElementById('rnaseq_option').style.display = document.querySelector('input[name="chromatin_potential"][value="yes"]').checked ? 'block' : 'none';
+    }
+
+    // NEW: Auto-fill bridge fields based on experiment method
     function updateBridgeFields() {
       const method = document.getElementById('exp_method').value;
       const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
@@ -524,12 +534,13 @@
           document.getElementById('config_debridge_tool').value = bridgeMap[method].deb;
         }
       } else {
+        // OTA or unknown: clear fields
         document.getElementById('config_bridge_fwd').value = '';
         document.getElementById('config_bridge_rev').value = '';
       }
     }
 
-    // Show single or dual index fields based on mapper selection (ATA only)
+    // NEW: Show single or dual index fields based on mapper selection (ATA only)
     function updateIndexVisibility() {
       const rnaTool = document.getElementById('config_rna_align_tool').value;
       const dnaTool = document.getElementById('config_dna_align_tool').value;
@@ -537,13 +548,17 @@
       const dualContainer = document.getElementById('dual_index_container');
       
       if (rnaTool === dnaTool) {
+        // Same mapper: show single index field
         singleContainer.style.display = 'block';
         dualContainer.style.display = 'none';
+        // Clear dual fields to avoid confusion
         document.getElementById('config_rna_align_index').value = '';
         document.getElementById('config_dna_align_index').value = '';
       } else {
+        // Different mappers: show dual index fields
         singleContainer.style.display = 'none';
         dualContainer.style.display = 'block';
+        // Clear single field
         document.getElementById('config_shared_index').value = '';
       }
     }
@@ -576,7 +591,7 @@
           setupForm('exp', ['Sample', 'RNA FASTQ', 'DNA FASTQ']);
           document.getElementById('ctrl_section').style.display = 'none';
         }
-      } else {
+      } else { // OTA
         if (otaCtrl === 'yes') {
           currentMode = { header: 'sample,fastq_1,fastq_2,control,description', ctrlTitle: '🧪 Input Control Samples', showCtrl: true };
           document.getElementById('samplesheet_ref').value = `sample,fastq_1,fastq_2,control,description\nSCIRT_chart_39,SRR10044362.fastq.gz,,SCIRT_INPUT,tissue:"K562"\nSCIRT_INPUT,SRR10044359.fastq.gz,,`;
@@ -716,6 +731,7 @@
 
     // ===== STEP 3: CONFIG GENERATOR (LOGIC) =====
     
+    // UPDATED BRIDGE PRESETS
     const bridgePresets = {
       grid: {
         unsplit: { dna_part: '*s[AG|AGCT]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'GTTCGGTGTGTG', rev: 'CACACACCGAAC', max_mm: 1, min_len: 14 },
@@ -730,6 +746,7 @@
       ota: { bridge_proc: false }
     };
 
+    // UPDATED MAPPER DEFAULTS
     const mapperDefaults = {
       hisat2: { 
         rna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --dta --no-temp-splicesite', 
@@ -785,10 +802,12 @@
       document.getElementById('config_exp_summary').textContent = `${group.toUpperCase()} / ${method.toUpperCase()}`;
       document.getElementById('config_data_summary').textContent = document.querySelector('input[name="data_type"]:checked')?.value === 'pe' ? 'Paired-end' : 'Single-end';
       document.getElementById('config_chromatin_summary').textContent = document.querySelector('input[name="chromatin_potential"]:checked')?.value === 'yes' ? 'Enabled' : 'Disabled';
-      document.getElementById('config_rnaseq_summary').textContent = 'N/A';
+      document.getElementById('config_rnaseq_summary').textContent = (group === 'ata' && document.querySelector('input[name="include_rnaseq"]:checked')?.value === 'yes') || (group === 'ota' && document.querySelector('input[name="ota_control"]:checked')?.value === 'yes') ? 'Yes' : 'No';
       
+      // Update bridge fields
       updateBridgeFields();
       
+      // Update mapper options and visibility
       updateMapperOptions();
       if (group === 'ata') {
         document.getElementById('ata_mappers_container').style.display = 'block';
@@ -811,7 +830,9 @@
       stepInitialized[1] = true;
     }
 
-    function toggleGenomeInput() {}
+    function toggleGenomeInput() {
+      // Kept for compatibility
+    }
 
     function toggleAdvancedConfig() {
       const adv = document.getElementById('advanced_config');
@@ -829,6 +850,7 @@
     }
 
     function generateConfig() {
+      // 1. Validate Required Fields
       const required = ['config_genome_fasta', 'config_annot_bed', 'config_annot_gtf', 'detect_strand_genes_list'];
       const missing = required.filter(id => !document.getElementById(id).value.trim());
       
@@ -845,11 +867,13 @@
         const dnaTool = document.getElementById('config_dna_align_tool').value;
         
         if (rnaTool === dnaTool) {
+          // Same mapper: validate shared index
           if (!document.getElementById('config_shared_index').value.trim()) {
             alert('ATA experiments with same RNA/DNA mapper require an index path.');
             return;
           }
         } else {
+          // Different mappers: validate both indices
           const ataMissing = ['config_rna_align_index', 'config_dna_align_index'].filter(id => !document.getElementById(id).value.trim());
           if (ataMissing.length > 0) {
             alert('ATA experiments with different RNA/DNA mappers require both index paths.');
@@ -858,12 +882,14 @@
         }
       }
 
+      // 2. Gather Values
       const split = document.querySelector('input[name="split_rna_dna"]:checked')?.value;
       const genomePath = document.getElementById('config_genome_fasta').value.trim();
       const annotBed = document.getElementById('config_annot_bed').value.trim();
       const annotGtf = document.getElementById('config_annot_gtf').value.trim();
       const detectGenes = document.getElementById('detect_strand_genes_list').value.trim();
       
+      // Determine mapper based on group
       const mapper = group === 'ata' ? document.getElementById('config_rna_align_tool').value : document.getElementById('config_mapper').value;
       const rnaOpts = document.getElementById('config_rna_align_opts').value.trim();
       const dnaOpts = document.getElementById('config_dna_align_opts').value.trim();
@@ -882,6 +908,7 @@
       const maxMem = document.getElementById('config_max_memory').value;
       const maxCpus = document.getElementById('config_max_cpus').value;
 
+      // 3. Build Config
       let cfg = `// Nextflow config generated on ${new Date().toISOString().split('T')[0]}\n\nincludeConfig "\${projectDir}/conf/base.config"\nincludeConfig "\${projectDir}/conf/modules.config"\n\nparams {\n`;
       cfg += `exp_type = '${method}'\nprocedure = 'old'\nsplit_by_chromosomes = false\n`;
       cfg += `dedup_tool = "${dedupTool}"\ntrim_tool = "${trimTool}"\nalign_tool = '${mapper}'\nmerge_pairedend_tool = '${mergeTool}'\n`;
@@ -889,26 +916,31 @@
       cfg += `genome_fasta = '${genomePath}'\n`;
       cfg += `detect_strand_genes_list = '${detectGenes}'\n`;
       
+      // Smart Index Logic for ATA
       if (group === 'ata') {
         const rnaTool = document.getElementById('config_rna_align_tool').value;
         const dnaTool = document.getElementById('config_dna_align_tool').value;
         cfg += `rna_align_tool = '${rnaTool}'\ndna_align_tool = '${dnaTool}'\n`;
         
         if (rnaTool === dnaTool) {
+          // Same mapper: output single index
           const sharedIdx = document.getElementById('config_shared_index').value.trim();
           if (sharedIdx) cfg += `${rnaTool}_index = '${sharedIdx}'\n`;
         } else {
+          // Different mappers: output both indices
           const rnaIdx = document.getElementById('config_rna_align_index').value.trim();
           const dnaIdx = document.getElementById('config_dna_align_index').value.trim();
           if (rnaIdx) cfg += `${rnaTool}_index = '${rnaIdx}'\n`;
           if (dnaIdx) cfg += `${dnaTool}_index = '${dnaIdx}'\n`;
         }
       } else if (genomeIdx) {
+        // OTA: single mapper index
         cfg += `${mapper}_index = '${genomeIdx}'\n`;
       }
       
-      cfg += `stages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
+      cfg += `hisat2_index = ''\nstages = 'annotation, splicing, normalize, peak_calling'\nannot_BED = "${annotBed}"\nannot_GTF = '${annotGtf}'\n`;
       
+      // Bridge section
       if (group === 'ota') {
         cfg += `// BRIDGE SEARCH: --------------------------------------------------------------------------------\nbridge_processing = false\n// ...\n`;
       } else if (method === 'imargi' || method === 'margi') {
@@ -946,6 +978,7 @@
       document.body.appendChild(a); a.click(); a.remove();
     }
 
+    // ===== FILE UPLOAD =====
     document.getElementById('configUpload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -995,7 +1028,7 @@
     }
 
     function finishWizard() {
-      alert("✅ Setup complete!\n\nFiles ready for download:\n• samplesheet.csv\n• nextflow.config\n• command.txt\n\nRun the command in your terminal to start the pipeline.");
+      alert("Setup complete!\n\nFiles ready for download:\n• samplesheet.csv\n• nextflow.config\n• command.txt\n\nRun the command in your terminal to start the pipeline.");
     }
 
     window.addEventListener('load', () => {
