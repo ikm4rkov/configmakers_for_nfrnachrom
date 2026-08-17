@@ -1,0 +1,846 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RNA-Chrom Pipeline Wizard — One-to-All (OTA)</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --primary-hover: #0056b3;
+            --secondary: #6c757d;
+            --danger: #dc3545;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --border: #dee2e6;
+            --hint: #6c757d;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px 15px 75px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h1 { text-align: center; color: #2c3e50; margin: 0 0 4px; font-size: 1.6rem; }
+        .subtitle { text-align: center; color: var(--hint); margin-bottom: 20px; font-size: 0.85rem; }
+        
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 10px; cursor: default; background: none; border: none;
+            font-size: 14px; font-weight: 600; color: var(--secondary); transition: 0.3s; position: relative;
+        }
+        .tab-btn.active { color: var(--primary); }
+        .tab-btn.active::after {
+            content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: var(--primary);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Forms & Grids */
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 0.88rem; }
+        label.req::after { content: ' *'; color: var(--danger); }
+        input[type="text"], select, textarea {
+            width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 5px;
+            font-size: 13px; box-sizing: border-box; transition: border 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,123,255,0.15);
+        }
+        input:disabled { background: #e9ecef; cursor: not-allowed; opacity: 0.8; }
+        textarea { font-family: 'Courier New', monospace; min-height: 260px; background: #f8f9fa; resize: vertical; }
+        .hint { color: var(--hint); font-size: 0.82rem; margin-top: 3px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        /* Tool-Param Rows (Advanced) */
+        .tool-param-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e9ecef;
+        }
+        .tool-param-row label { font-size: 0.82rem; margin-bottom: 3px; }
+
+        /* Buttons */
+        .btn {
+            padding: 9px 16px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.88rem;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #bb2d3b; }
+        .btn-outline { background: transparent; border: 1px dashed var(--secondary); color: var(--secondary); }
+        .btn-outline:hover { background: #e9ecef; }
+        .btn-group { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        
+        /* Navigation Footer */
+        .nav-footer {
+            position: fixed; bottom: 0; left: 0; right: 0; background: white;
+            border-top: 1px solid var(--border); padding: 12px 20px;
+            display: flex; justify-content: center; gap: 12px; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); z-index: 100;
+        }
+
+        /* Samplesheet */
+        .example-block { background: #fff3cd; border: 1px solid #ffeeba; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.88rem; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        th { background: #e9ecef; }
+        .row-actions button { padding: 3px 7px; font-size: 0.78rem; }
+
+        /* Advanced Toggle */
+        .adv-toggle { display: block; width: 100%; margin: 16px 0; text-align: center; }
+        .advanced-section { display: none; margin-top: 12px; }
+        .advanced-section.show { display: block; }
+        
+        /* Unsaved Warning */
+        .unsaved-warning { 
+            display: none; background: #fff3cd; border: 1px solid #ffc107; 
+            padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; 
+            font-size: 0.85rem; color: #856404; text-align: center;
+        }
+        .unsaved-warning.show { display: block; }
+        
+        /* Validation */
+        .validation-msg { margin-top: 6px; font-size: 0.82rem; }
+        .validation-msg.error { color: var(--danger); }
+        .validation-msg.success { color: #28a745; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>RNA-Chrom Pipeline Wizard</h1>
+    <div class="subtitle">One-to-All (OTA) edition · linear setup 1 → 2 → 3</div>
+    
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="setup">1. Experiment & Config</button>
+        <button class="tab-btn" data-tab="samplesheet">2. Samplesheet</button>
+        <button class="tab-btn" data-tab="launch">3. Launch Command</button>
+    </div>
+
+    <!-- Unsaved Changes Warning -->
+    <div id="unsaved_warning" class="unsaved-warning">
+        ⚠ You have unsaved changes. Please click "Generate nextflow.config" before proceeding.
+    </div>
+
+    <!-- TAB 1: EXPERIMENT & CONFIG -->
+    <div id="setup" class="tab-content active">
+        <h3>Experiment Setup</h3>
+        
+        <div class="form-group">
+            <label class="req">Experiment Method / Type</label>
+            <select id="exp_method" required>
+                <option value="">— Select Method —</option>
+                <option value="ChIRP-seq">ChIRP-seq</option>
+                <option value="RAP">RAP</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Sequencing Data Type</label>
+            <input type="text" id="seq_type" value="Single-end (SE)" disabled title="OTA mode only supports single-end data">
+        </div>
+
+        <h3>Pipeline Configuration</h3>
+        
+        <div class="form-group">
+            <label class="req">Genome FASTA Path</label>
+            <input type="text" id="ref_fasta" placeholder="/path/to/genome.fa" required>
+        </div>
+
+        <div class="form-group">
+            <label class="req">Ribosomal Lineage Genes List</label>
+            <input type="text" id="ribosomal_genes" placeholder="/path/to/ribosomal_genes.txt" required>
+        </div>
+
+        <div class="form-group">
+            <label class="req">Genome Index Path</label>
+            <input type="text" id="ref_index" placeholder="/path/to/genome_index" required>
+        </div>
+
+        <div class="form-group">
+            <label class="req">Alignment Tool</label>
+            <select id="aligner" required>
+                <option value="">— Select Aligner —</option>
+                <option value="hisat2">hisat2</option>
+                <option value="bwa mem">bwa mem</option>
+                <option value="bwa aln">bwa aln</option>
+                <option value="bowtie2">bowtie2</option>
+                <option value="star">star</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="req">Annotation GTF File</label>
+            <input type="text" id="annot_gtf" placeholder="/path/to/annotation.gtf" required>
+        </div>
+
+        <div class="form-group">
+            <label class="req">Annotation BED File</label>
+            <input type="text" id="annot_bed" placeholder="/path/to/regions.bed" required>
+        </div>
+
+        <!-- Bridge Processing (Hidden for OTA) -->
+        <input type="hidden" id="bridge_processing_tool" value="false">
+
+        <!-- Advanced Options Toggle -->
+        <button class="btn btn-outline adv-toggle" type="button" onclick="toggleAdvanced()">▼ Show Advanced Options</button>
+        
+        <div class="advanced-section" id="advanced_options">
+            <div class="tool-param-row">
+                <div>
+                    <label>Deduplication Tool</label>
+                    <select id="dedup" onchange="autoFillDedupFlags()">
+                        <option value="fastq-dupaway">fastq-dupaway</option>
+                        <option value="fastuniq">fastuniq</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Dedup Flags</label>
+                    <input type="text" id="dedup_flags" placeholder="--format fastq --compare-seq tight">
+                </div>
+            </div>
+
+            <div class="tool-param-row">
+                <div>
+                    <label>Trimming Tool</label>
+                    <select id="trimmer" onchange="autoFillTrimFlags()">
+                        <option value="fastp">fastp</option>
+                        <option value="trimmomatic">trimmomatic</option>
+                        <option value="bbduk">bbduk</option>
+                        <option value="cutadapt">cutadapt</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Trim Flags</label>
+                    <input type="text" id="trim_flags" placeholder="-5 --correction --cut_window_size 5">
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Max memory per process</label>
+                    <input type="text" id="max_mem" value="8.GB">
+                </div>
+                <div class="form-group">
+                    <label>Max CPUs per process</label>
+                    <input type="text" id="max_cpu" value="4">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Alignment Options (auto-filled based on tool)</label>
+                <input type="text" id="align_options" placeholder="Will auto-fill on aligner selection" style="background:#f8f9fa;">
+                <div class="hint">DNA alignment options for OTA experiments (editable)</div>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="generateConfig()">Generate nextflow.config</button>
+            <button class="btn btn-secondary" id="btn_dl_config" onclick="downloadFile('nextflow.config', document.getElementById('config_output').value)" disabled>Download config</button>
+        </div>
+        <textarea id="config_output" placeholder="// Configuration will appear here after generation..."></textarea>
+    </div>
+
+    <!-- TAB 2: SAMPLESHEET -->
+    <div id="samplesheet" class="tab-content">
+        <h3>Samplesheet Builder</h3>
+        
+        <div class="example-block">
+            <strong>For one-to-all methods, use the format:</strong><br>
+            <code>sample,fastq_1,fastq_2,description</code><br>
+            <code>SCIRT_chart_39,SRR10044362.fastq.gz,,tissue:"K562"</code><br><br>
+            <strong>OTA with input controls:</strong><br>
+            <code>sample,fastq_1,fastq_2,control,description</code><br>
+            <code>SCIRT_chart_39,SRR10044362.fastq.gz,,SCIRT_INPUT,tissue:"K562"</code><br>
+            <code>SCIRT_INPUT,SRR10044359.fastq.gz,,</code><br><br>
+            <em>The control column specifies which sample serves as the input control. Control sample IDs must match between data and control rows.</em>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Sample ID *</label>
+                <input type="text" id="row_sample" placeholder="e.g., SCIRT_chart_39">
+            </div>
+            <div class="form-group">
+                <label>FastQ 1 Path *</label>
+                <input type="text" id="row_fastq1" placeholder="e.g., SRR10044362.fastq.gz">
+            </div>
+            <div class="form-group">
+                <label>Control ID (optional)</label>
+                <input type="text" id="row_control" placeholder="e.g., SCIRT_INPUT">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="row_desc" placeholder="e.g., tissue:&quot;K562&quot;">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="addSampleRow()">+ Add Sample Row</button>
+        
+        <div id="samplesheet_validation" class="validation-msg"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Sample</th>
+                    <th>fastq_1</th>
+                    <th>fastq_2</th>
+                    <th>control</th>
+                    <th>description</th>
+                    <th class="row-actions">Action</th>
+                </tr>
+            </thead>
+            <tbody id="samplesheet_body"></tbody>
+        </table>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="generateCSV()">Generate CSV</button>
+            <button class="btn btn-secondary" id="btn_dl_csv" onclick="downloadFile('samplesheet.csv', document.getElementById('csv_output').value)" disabled>Download samplesheet.csv</button>
+            <button class="btn btn-danger" onclick="clearSamplesheet()">Clear All</button>
+        </div>
+        <textarea id="csv_output" placeholder="// CSV content will appear here..."></textarea>
+    </div>
+
+    <!-- TAB 3: LAUNCH COMMAND -->
+    <div id="launch" class="tab-content">
+        <h3>Pipeline Launch Command</h3>
+        <div class="hint">Build the exact command to run your pipeline.</div>
+        
+        <div class="form-group">
+            <label class="req">Pipeline path</label>
+            <input type="text" id="pipeline_path" placeholder="/path/to/rna-chrom-pipeline" required>
+        </div>
+
+        <div class="form-group">
+            <label>Container profile</label>
+            <select id="container_profile">
+                <option value="singularity">singularity (recommended)</option>
+                <option value="docker">docker</option>
+                <option value="conda">conda</option>
+                <option value="local">local (no container)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Config file path</label>
+            <input type="text" id="config_path" value="nextflow.config">
+        </div>
+
+        <div class="form-group">
+            <label class="req">Samplesheet path (--input)</label>
+            <input type="text" id="samplesheet_path" value="samplesheet.csv" required>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Work directory</label>
+                <input type="text" id="work_dir" value="work">
+            </div>
+            <div class="form-group">
+                <label>Output directory</label>
+                <input type="text" id="output_dir" value="results">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="generateCommand()">Generate Command</button>
+            <button class="btn btn-secondary" id="btn_dl_cmd" onclick="downloadFile('command.txt', document.getElementById('command_output').value)" disabled>Download command.txt</button>
+            <button class="btn btn-secondary" onclick="downloadAllFiles()">Download All Files</button>
+        </div>
+        <div class="hint" style="margin-top:8px;">Note: Your browser may prompt to allow multiple downloads when using "Download All Files".</div>
+        <textarea id="command_output" placeholder="// Command will appear here..."></textarea>
+    </div>
+</div>
+
+<!-- Navigation Footer -->
+<div class="nav-footer">
+    <button class="btn btn-outline" onclick="resetForm()">↺ Reset Form</button>
+    <button class="btn btn-outline" onclick="navigateBack()">← Back</button>
+    <button class="btn btn-primary" onclick="navigateNext()">Next →</button>
+</div>
+
+<script>
+    // Global state
+    let samples = [];
+    let configGenerated = false;
+    let csvGenerated = false;
+    let cmdGenerated = false;
+    let hasUnsavedChanges = false;
+    let currentTabIdx = 0;
+    const tabs = ['setup', 'samplesheet', 'launch'];
+
+    // Mapper defaults for auto-filling alignment options
+    const mapperDefaults = {
+        hisat2: { 
+            rna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --dta --no-temp-splicesite', 
+            dna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --no-spliced-alignment' 
+        },
+        bwa_mem: { rna: '-Y -a -k 17 -T 1', dna: '-Y -a -k 18 -T 1' },
+        bwa_aln: { rna: '', dna: '' },
+        bowtie2: { 
+            rna: '--end-to-end -k 10 --no-1mm-upfront -D 15 -R 2 -i S,1,0.50 -N 0 -L 19 --score-min L,-0.6,-0.6', 
+            dna: '--end-to-end -k 10 --no-1mm-upfront -D 15 -R 2 -i S,1,1.15 -N 0 -L 19 --score-min L,-0.6,-0.6' 
+        },
+        star: { 
+            rna: '--outSAMtype BAM Unsorted --outSAMstrandField None --outSAMattributes NM --outSAMunmapped Within --outSAMmultNmax 10 --outFilterMultimapNmax 100 --outReadsUnmapped None --outMultimapperOrder Old_2.4 --alignIntronMin 20 --alignEndsType EndToEnd --outFilterScoreMinOverLread 0.66', 
+            dna: '--outSAMtype BAM Unsorted --outSAMstrandField None --outSAMattributes NM --outSAMunmapped Within --outSAMmultNmax 10 --outFilterMultimapNmax 100 --outReadsUnmapped None --outMultimapperOrder Old_2.4 --alignIntronMin 20 --alignEndsType EndToEnd --outFilterScoreMinOverLread 0.66 --alignIntronMax 19' 
+        }
+    };
+
+    // Tool option defaults
+    const toolOptionDefaults = {
+        dedup: { 'fastq-dupaway': '--format fastq --compare-seq tight', 'fastuniq': '' },
+        trim: { 'fastp': '-5 --correction --cut_window_size 5 --cut_mean_quality 26', 'trimmomatic': '', 'bbduk': '', 'cutadapt': '' }
+    };
+
+    // Tab Navigation - ONLY via footer buttons
+    function showTab(tabId, preserveCurrent = false) {
+        // Check for unsaved changes before navigating away from setup
+        if (hasUnsavedChanges && tabId !== 'setup') {
+            if (!confirm("⚠ You have unsaved changes in the config. Proceed anyway?")) {
+                return false;
+            }
+        }
+        
+        // If not preserving current tab data, reset it to defaults
+        if (!preserveCurrent && currentTabIdx < tabs.indexOf(tabId)) {
+            resetCurrentTab();
+        }
+        
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+        currentTabIdx = tabs.indexOf(tabId);
+        return true;
+    }
+
+    function navigateNext() {
+        if (currentTabIdx < tabs.length - 1) {
+            // Check unsaved changes when going forward from setup
+            if (currentTabIdx === 0 && hasUnsavedChanges) {
+                document.getElementById('unsaved_warning').classList.add('show');
+                alert("⚠ You have unsaved changes. Please click 'Generate nextflow.config' before proceeding.");
+                return;
+            }
+            showTab(tabs[currentTabIdx + 1], false);
+        }
+    }
+
+    function navigateBack() {
+        if (currentTabIdx > 0) {
+            // Reset current tab to defaults, keep previous tabs safe
+            resetCurrentTab();
+            showTab(tabs[currentTabIdx - 1], true);
+        }
+    }
+
+    function resetCurrentTab() {
+        const currentTab = tabs[currentTabIdx];
+        
+        if (currentTab === 'setup') {
+            // Reset config tab fields to defaults but keep required selections if made
+            const method = document.getElementById('exp_method').value;
+            document.querySelectorAll('#setup input:not([disabled]), #setup select').forEach(el => {
+                if (el.id !== 'exp_method' && el.id !== 'aligner') {
+                    if (el.defaultValue) el.value = el.defaultValue;
+                    else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+                    else el.value = '';
+                }
+            });
+            // Restore method selection if it was made
+            if (method) document.getElementById('exp_method').value = method;
+            document.getElementById('align_options').value = '';
+            document.getElementById('dedup_flags').value = '';
+            document.getElementById('trim_flags').value = '';
+            document.getElementById('config_output').value = '// Configuration will appear here after generation...';
+            document.getElementById('btn_dl_config').disabled = true;
+            configGenerated = false;
+            hasUnsavedChanges = false;
+            document.getElementById('unsaved_warning').classList.remove('show');
+            
+        } else if (currentTab === 'samplesheet') {
+            // Reset samplesheet inputs but keep the table data
+            ['row_sample', 'row_fastq1', 'row_control', 'row_desc'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('csv_output').value = '// CSV content will appear here...';
+            document.getElementById('btn_dl_csv').disabled = true;
+            csvGenerated = false;
+            showValidation("", "");
+            
+        } else if (currentTab === 'launch') {
+            // Reset launch form fields to defaults
+            document.getElementById('pipeline_path').value = '';
+            document.getElementById('container_profile').selectedIndex = 0;
+            document.getElementById('config_path').value = 'nextflow.config';
+            document.getElementById('samplesheet_path').value = 'samplesheet.csv';
+            document.getElementById('work_dir').value = 'work';
+            document.getElementById('output_dir').value = 'results';
+            document.getElementById('command_output').value = '// Command will appear here...';
+            document.getElementById('btn_dl_cmd').disabled = true;
+            cmdGenerated = false;
+        }
+    }
+
+    function toggleAdvanced() {
+        const section = document.getElementById('advanced_options');
+        const btn = document.querySelector('.adv-toggle');
+        section.classList.toggle('show');
+        btn.textContent = section.classList.contains('show') ? '▲ Hide Advanced Options' : '▼ Show Advanced Options';
+    }
+
+    function markUnsavedChanges() {
+        hasUnsavedChanges = true;
+        document.getElementById('unsaved_warning').classList.add('show');
+        configGenerated = false;
+        document.getElementById('btn_dl_config').disabled = true;
+    }
+
+    // Auto-fill functions (instant, no button)
+    function autoFillAlignOptions() {
+        const aligner = document.getElementById('aligner').value;
+        if (aligner && mapperDefaults[aligner.replace(' ', '_')]) {
+            const key = aligner.replace(' ', '_');
+            document.getElementById('align_options').value = mapperDefaults[key].dna;
+            markUnsavedChanges();
+        }
+    }
+
+    function autoFillDedupFlags() {
+        const dedup = document.getElementById('dedup').value;
+        if (toolOptionDefaults.dedup[dedup]) {
+            document.getElementById('dedup_flags').value = toolOptionDefaults.dedup[dedup];
+            markUnsavedChanges();
+        }
+    }
+
+    function autoFillTrimFlags() {
+        const trimmer = document.getElementById('trimmer').value;
+        if (toolOptionDefaults.trim[trimmer]) {
+            document.getElementById('trim_flags').value = toolOptionDefaults.trim[trimmer];
+            markUnsavedChanges();
+        }
+    }
+
+    // Config Generation
+    function generateConfig() {
+        const expMethod = document.getElementById('exp_method').value;
+        const refFasta = document.getElementById('ref_fasta').value;
+        const ribosomalGenes = document.getElementById('ribosomal_genes').value;
+        const refIndex = document.getElementById('ref_index').value;
+        const aligner = document.getElementById('aligner').value;
+        const annotGtf = document.getElementById('annot_gtf').value;
+        const annotBed = document.getElementById('annot_bed').value;
+        const dedup = document.getElementById('dedup').value;
+        const dedupFlags = document.getElementById('dedup_flags').value || toolOptionDefaults.dedup[dedup] || '';
+        const trimmer = document.getElementById('trimmer').value;
+        const trimFlags = document.getElementById('trim_flags').value || toolOptionDefaults.trim[trimmer] || '';
+        const maxMem = document.getElementById('max_mem').value;
+        const maxCpu = document.getElementById('max_cpu').value;
+        const alignOptions = document.getElementById('align_options').value || 
+            (mapperDefaults[aligner.replace(' ', '_')]?.dna) || '';
+
+        const config = `includeConfig "\${projectDir}/conf/base.config"
+includeConfig "\${projectDir}/conf/modules.config"
+
+params {
+    exp_type = 'ota'
+    procedure = 'standard'
+    split_by_chromosomes = false
+    dedup_tool = "${dedup}"
+    trim_tool = "${trimmer}"
+    align_tool = '${aligner}'
+    genome_fasta = '${refFasta}'
+    ribosomal_lineage_genes = '${ribosomalGenes}'
+    rna_align_tool = '${aligner}'
+    dna_align_tool = '${aligner}'
+    hisat2_index = '${refIndex}'
+    stages = 'annotation, peak_calling, normalize'
+    annot_BED = "${annotBed}"
+    annot_GTF = '${annotGtf}'
+    max_memory = '${maxMem}'
+    max_cpus = ${maxCpu}
+    publish_dir_mode = 'copy'
+}
+
+process {
+    withName: '.*' {
+        cpus = ${maxCpu}
+        memory = ${maxMem}
+    }
+}
+
+flags = [
+    ${dedup}: "${dedupFlags}",
+    ${trimmer}: "${trimFlags}",
+    dna_align_options: "${alignOptions}"
+]`;
+
+        document.getElementById('config_output').value = config;
+        document.getElementById('btn_dl_config').disabled = false;
+        configGenerated = true;
+        hasUnsavedChanges = false;
+        document.getElementById('unsaved_warning').classList.remove('show');
+        return config;
+    }
+
+    // Samplesheet Logic
+    function addSampleRow() {
+        const sample = document.getElementById('row_sample').value.trim();
+        const fastq1 = document.getElementById('row_fastq1').value.trim();
+        const control = document.getElementById('row_control').value.trim();
+        const desc = document.getElementById('row_desc').value.trim();
+
+        if (!sample || !fastq1) { 
+            showValidation("Sample ID and FastQ 1 path are required.", "error"); 
+            return; 
+        }
+
+        samples.push({ sample, fastq1, fastq2: '', control, desc });
+        renderSamplesheet();
+        validateControlMapping();
+
+        // Clear inputs
+        ['row_sample', 'row_fastq1', 'row_control', 'row_desc'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('row_sample').focus();
+    }
+
+    function renderSamplesheet() {
+        const tbody = document.getElementById('samplesheet_body');
+        tbody.innerHTML = '';
+        samples.forEach((row, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(row.sample)}</td>
+                <td>${escapeHtml(row.fastq1)}</td>
+                <td>${row.fastq2}</td>
+                <td>${escapeHtml(row.control)}</td>
+                <td>${escapeHtml(row.desc)}</td>
+                <td class="row-actions"><button class="btn btn-danger" onclick="removeSample(${idx})">✕</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function removeSample(idx) {
+        samples.splice(idx, 1);
+        renderSamplesheet();
+        validateControlMapping();
+    }
+
+    function clearSamplesheet() {
+        samples = [];
+        renderSamplesheet();
+        document.getElementById('csv_output').value = '// CSV content will appear here...';
+        document.getElementById('btn_dl_csv').disabled = true;
+        csvGenerated = false;
+        showValidation("", "");
+    }
+
+    function validateControlMapping() {
+        const controlsUsed = samples.filter(s => s.control.trim() !== '').map(s => s.control.trim());
+        
+        if (controlsUsed.length === 0) {
+            showValidation("✓ No controls specified. All samples will be processed independently.", "success");
+            return true;
+        }
+
+        const controlSamples = samples.filter(s => controlsUsed.includes(s.sample)).map(s => s.sample);
+        const missing = controlsUsed.filter(c => !controlSamples.includes(c));
+        
+        if (missing.length > 0) {
+            showValidation(`⚠ Warning: Control sample(s) not found in data rows: ${missing.join(', ')}. Add corresponding data rows or remove control references.`, "error");
+            return false;
+        } else {
+            showValidation("✓ Control mappings verified. All referenced controls exist in the samplesheet.", "success");
+            return true;
+        }
+    }
+
+    function showValidation(message, type) {
+        const el = document.getElementById('samplesheet_validation');
+        if (!el) return;
+        el.textContent = message;
+        el.className = `validation-msg ${type}`;
+    }
+
+    function escapeHtml(text) {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text ? text.replace(/[&<>"']/g, m => map[m]) : '';
+    }
+
+    function generateCSV() {
+        const hasControls = samples.some(s => s.control.trim() !== '');
+        let header = hasControls 
+            ? 'sample,fastq_1,fastq_2,control,description\n' 
+            : 'sample,fastq_1,fastq_2,description\n';
+            
+        let csv = header;
+        samples.forEach(s => {
+            if (hasControls) {
+                csv += `${s.sample},${s.fastq1},${s.fastq2},${s.control},${s.desc}\n`;
+            } else {
+                csv += `${s.sample},${s.fastq1},${s.fastq2},${s.desc}\n`;
+            }
+        });
+        
+        document.getElementById('csv_output').value = csv;
+        document.getElementById('btn_dl_csv').disabled = false;
+        csvGenerated = true;
+        return csv;
+    }
+
+    // Command Generation
+    function generateCommand() {
+        const pipelinePath = document.getElementById('pipeline_path').value;
+        const profile = document.getElementById('container_profile').value;
+        const configPath = document.getElementById('config_path').value;
+        const sheetPath = document.getElementById('samplesheet_path').value;
+        const workDir = document.getElementById('work_dir').value;
+        const outDir = document.getElementById('output_dir').value;
+
+        const cmd = `nextflow run ${pipelinePath} \\
+  -profile ${profile} \\
+  -c ${configPath} \\
+  --input ${sheetPath} \\
+  --experiment_type OTA \\
+  --work_dir ${workDir} \\
+  --outdir ${outDir}`;
+
+        document.getElementById('command_output').value = cmd;
+        document.getElementById('btn_dl_cmd').disabled = false;
+        cmdGenerated = true;
+        return cmd;
+    }
+
+    // Download Utilities
+    function downloadFile(filename, content) {
+        if (!content || content.includes('will appear here') || content.startsWith('//')) {
+            alert("Please generate the content first before downloading.");
+            return;
+        }
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function downloadAllFiles() {
+        // Generate all files if not already done
+        if (!configGenerated) generateConfig();
+        if (!csvGenerated) generateCSV();
+        if (!cmdGenerated) generateCommand();
+        
+        // Download in sequence with small delay to avoid browser blocking
+        setTimeout(() => downloadFile('nextflow.config', document.getElementById('config_output').value), 0);
+        setTimeout(() => downloadFile('samplesheet.csv', document.getElementById('csv_output').value), 300);
+        setTimeout(() => downloadFile('command.txt', document.getElementById('command_output').value), 600);
+    }
+
+    // Reset Form - Full reset
+    function resetForm() {
+        if (!confirm("Reset all fields to default values?")) return;
+        
+        // Reset all inputs across all tabs
+        document.querySelectorAll('input:not([disabled]), select').forEach(el => {
+            if (el.type === 'checkbox' || el.type === 'radio') {
+                el.checked = el.defaultChecked;
+            } else if (el.tagName === 'SELECT') {
+                el.selectedIndex = 0;
+            } else {
+                el.value = el.defaultValue || '';
+            }
+        });
+        
+        // Reset specific defaults
+        document.getElementById('seq_type').value = "Single-end (SE)";
+        document.getElementById('max_mem').value = "8.GB";
+        document.getElementById('max_cpu').value = "4";
+        document.getElementById('config_path').value = "nextflow.config";
+        document.getElementById('samplesheet_path').value = "samplesheet.csv";
+        document.getElementById('work_dir').value = "work";
+        document.getElementById('output_dir').value = "results";
+        document.getElementById('align_options').value = "";
+        document.getElementById('dedup_flags').value = "";
+        document.getElementById('trim_flags').value = "";
+        
+        // Clear samples and outputs
+        samples = [];
+        renderSamplesheet();
+        ['config_output', 'csv_output', 'command_output'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '// Content will appear here after generation...';
+        });
+        ['btn_dl_config', 'btn_dl_csv', 'btn_dl_cmd'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = true;
+        });
+        
+        // Reset status flags
+        configGenerated = csvGenerated = cmdGenerated = hasUnsavedChanges = false;
+        document.getElementById('unsaved_warning').classList.remove('show');
+        showValidation("", "");
+        
+        // Reset advanced toggle
+        const advSection = document.getElementById('advanced_options');
+        if (advSection) {
+            advSection.classList.remove('show');
+            document.querySelector('.adv-toggle').textContent = '▼ Show Advanced Options';
+        }
+        
+        // Return to first tab
+        showTab('setup', false);
+        alert("Form reset successfully.");
+    }
+
+    // Initialize event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        // NO tab button click handlers - only footer navigation allowed
+        
+        // Auto-fill on aligner change (instant)
+        document.getElementById('aligner').addEventListener('change', autoFillAlignOptions);
+        
+        // Track changes on required/advanced fields for unsaved warning
+        const trackedFields = [
+            'exp_method', 'ref_fasta', 'ribosomal_genes', 'ref_index', 'aligner', 
+            'annot_gtf', 'annot_bed', 'dedup', 'dedup_flags', 'trimmer', 
+            'trim_flags', 'max_mem', 'max_cpu'
+        ];
+        
+        trackedFields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('change', markUnsavedChanges);
+                el.addEventListener('input', markUnsavedChanges);
+            }
+        });
+        
+        // Auto-validate on control field change
+        document.getElementById('row_control')?.addEventListener('blur', validateControlMapping);
+        
+        // Show first tab
+        showTab('setup', false);
+    });
+</script>
+</body>
+</html>
