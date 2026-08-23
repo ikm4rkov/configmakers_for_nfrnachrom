@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RNA-Chrom Pipeline Wizard — All-to-All (ATA)</title>
+    <title>RNA-Chrom Pipeline Wizard — All-to-all (ATA)</title>
     <style>
         :root {
             --primary: #007bff;
@@ -112,7 +112,7 @@
 
 <div class="container">
     <h1>RNA-Chrom Pipeline Wizard</h1>
-    <div class="subtitle">All-to-All (ATA) edition · linear setup 1 → 2 → 3</div>
+    <div class="subtitle">All-to-all (ATA) edition · linear setup 1 → 2 → 3</div>
 
     <div class="tabs">
         <button class="tab-btn active" data-tab="1">1. Experiment & Config</button>
@@ -126,7 +126,7 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Experiment Group</label>
-                <input type="text" value="All-to-All (ATA)" disabled>
+                <input type="text" value="All-to-all (ATA)" disabled>
             </div>
             <div class="form-group">
                 <label class="req">Experiment Method / Type</label>
@@ -240,7 +240,7 @@ rnaseq_HFFc6_imargi_1,,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6
         </div>
 
         <div class="form-group">
-            <label class="req">Global Experiment Name</label>
+            <label class="req">Global Experiment Name (only Latin symbols, digits and underscore _ are allowed)</label>
             <input type="text" id="globalExpName" placeholder="e.g., HFFc6_imargi">
             <div class="hint" id="expNameHint">Single experiment per sheet. RNA-seq rows will automatically get the `rnaseq_` prefix.</div>
         </div>
@@ -248,8 +248,8 @@ rnaseq_HFFc6_imargi_1,,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6
         <div class="grid-2" style="background:#f8f9fa; padding:12px; border-radius:6px; margin-bottom:12px;">
             <div class="form-group"><label class="req">Sample ID</label><input type="text" id="ss_sample"></div>
             <div class="form-group"><label>Row Type</label><select id="ss_type"><option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option></select></div>
-            <div class="form-group"><label class="req">RNA FastQ Path</label><input type="text" id="ss_rna" placeholder="Leave empty for DNA-only controls"></div>
-            <div class="form-group"><label class="req">DNA FastQ Path</label><input type="text" id="ss_dna" placeholder="Leave empty for RNA-only controls"></div>
+            <div class="form-group"><label class="req">Forward (Paired-end data)/ RNA (no bridge split data) FASTQ</label><input type="text" id="ss_rna" placeholder="Leave empty for DNA-only controls"></div>
+            <div class="form-group"><label class="req">Reverse complement (Paired-end data)/ DNA (no bridge split data) FASTQ</label><input type="text" id="ss_dna" placeholder="Leave empty for RNA-only controls"></div>
             <div class="form-group" style="grid-column: span 2;"><label>Description (Optional)</label><input type="text" id="ss_desc" placeholder='e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'></div>
         </div>
         <button class="btn btn-primary" onclick="addSampleRow()">+ Add Sample Row</button>
