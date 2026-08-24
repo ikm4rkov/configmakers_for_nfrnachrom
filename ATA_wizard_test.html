@@ -209,6 +209,11 @@
                 <div class="form-group"><label>Max memory per process</label><input type="text" id="maxMem" value="128.GB"></div>
                 <div class="form-group"><label>Max CPUs per process</label><input type="text" id="maxCpus" value="16"></div>
             </div>
+            <div class="grid-3">
+                <div class="form-group"><label>Gene blacklist</label><input type="text" id="blacklist" value="blacklist.csv"></div>
+                <div class="form-group"><label>De novo transcript assembly</label><input type="text" id="denovo" value="true"></div>
+		<div class="form-group"><label>Peak calling</label><input type="text" id="peakcall" value="true"></div>
+            </div>
         </div>
 
         <h3 style="font-size:1.2rem; margin-top: 18px;">nextflow.config Output</h3>
@@ -486,6 +491,9 @@ ${idxLine}
     description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""
     max_memory = '${document.getElementById('maxMem').value}'
     max_cpus = ${document.getElementById('maxCpus').value}
+    blacklist = '${document.getElementById('blacklist').value}'
+    de_novo_assembly = '${document.getElementById('denovo').value}'
+    peak_calling = '${document.getElementById('peakcall').value}'
     publish_dir_mode = 'copy'
 }
 
