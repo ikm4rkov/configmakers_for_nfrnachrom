@@ -256,7 +256,7 @@ rnaseq_HFFc6_imargi_1,,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6
             <div class="form-group"><label>Row Type</label><select id="ss_type"><option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option></select></div>
             <div class="form-group"><label class="req">Forward (Paired-end data)/ RNA (no bridge split data) FASTQ</label><input type="text" id="ss_rna" placeholder="Leave empty for DNA-only controls"></div>
             <div class="form-group"><label class="req">Reverse complement (Paired-end data)/ DNA (no bridge split data) FASTQ</label><input type="text" id="ss_dna" placeholder="Leave empty for RNA-only controls"></div>
-            <div class="form-group" style="grid-column: span 2;"><label>Description (Optional)</label><input type="text" id="ss_desc" placeholder='e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'></div>
+            <div class="form-group" style="grid-column: span 2;"><label>Description (required for RNA-seq)</label><input type="text" id="ss_desc" placeholder='e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'></div>
         </div>
         <button class="btn btn-primary" onclick="addSampleRow()">+ Add Sample Row</button>
 
@@ -411,7 +411,7 @@ rnaseq_HFFc6_imargi_1,,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6
         const dna = document.getElementById('dnaAlignTool').value;
         const box = document.getElementById('indexPaths');
         if (rna && dna && rna === dna) {
-            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label class="req">Alignment Index Path (shared)</label><input type="text" id="sharedIdx" placeholder="/path/to/shared/index"></div>`;
+            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label>Alignment Index Path (calculates from genome FASTA if empty)</label><input type="text" id="sharedIdx" placeholder=""></div>`;
         } else {
             box.innerHTML = `
                 <div class="form-group"><label class="req">RNA Alignment Index Path</label><input type="text" id="rnaIdx" placeholder="/path/to/rna/index"></div>
@@ -449,74 +449,118 @@ rnaseq_HFFc6_imargi_1,,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6
     }
 
     // ===== CONFIG GENERATION =====
-    function generateConfig(silent = false) {
-        const exp = document.getElementById('expMethod').value;
-        const rnaT = document.getElementById('rnaAlignTool').value;
-        const dnaT = document.getElementById('dnaAlignTool').value;
-        const shared = document.getElementById('sharedIdx')?.value || '';
-        const rnaI = document.getElementById('rnaIdx')?.value || '';
-        const dnaI = document.getElementById('dnaIdx')?.value || '';
-        
-        let idxLine = (rnaT === dnaT) 
-            ? `    ${rnaT}_index = '${shared || 'SHARED_INDEX_PATH'}'`
-            : `    rna_${rnaT}_index = '${rnaI || 'RNA_INDEX_PATH'}'\n    dna_${dnaT}_index = '${dnaI || 'DNA_INDEX_PATH'}'`;
+function generateConfig(silent = false) {
+    // 1. Extract and trim values from the REQUIRED HTML fields
+    const exp = document.getElementById('expMethod').value.trim();
+    const rnaT = document.getElementById('rnaAlignTool').value.trim();
+    const dnaT = document.getElementById('dnaAlignTool').value.trim();
+    const genome_fasta = document.getElementById('genomeFasta').value.trim();
+    const detect_strand_genes_list = document.getElementById('lineageGenes').value.trim();
+    const annot_BED = document.getElementById('annotBed').value.trim();
+    const annot_GTF = document.getElementById('annotGtf').value.trim();
 
-        const cfg = `includeConfig "\${projectDir}/conf/base.config"
+    // 2. Validate that all required fields are filled
+    if (!exp || !rnaT || !dnaT || !genome_fasta || !detect_strand_genes_list || !annot_BED || !annot_GTF) {
+        alert("Warning: All required fields must be filled out.");
+        return; // Stop execution early if validation fails
+    }
+
+    // 3. Extract OPTIONAL index fields (THESE WERE MISSING IN YOUR SNIPPET, CAUSING THE CRASH)
+    const shared = document.getElementById('sharedIdx')?.value.trim() || '';
+    const rnaI = document.getElementById('rnaIdx')?.value.trim() || '';
+    const dnaI = document.getElementById('dnaIdx')?.value.trim() || '';
+
+    // 4. Extract other advanced/optional fields to keep the template clean
+    const dedupTool = document.getElementById('dedupTool').value;
+    const dedupFlags = document.getElementById('dedupFlags').value;
+    const trimTool = document.getElementById('trimTool').value;
+    const trimFlags = document.getElementById('trimFlags').value;
+    const mergeTool = document.getElementById('mergeTool').value;
+    const mergeFlags = document.getElementById('mergeFlags').value;
+    const rnaOpts = document.getElementById('rnaOpts').value;
+    const dnaOpts = document.getElementById('dnaOpts').value;
+    const bridgeProc = document.getElementById('bridgeProc').value;
+    const debridgeTool = document.getElementById('debridgeTool').value;
+    const fwdBridge = document.getElementById('fwdBridge').value;
+    const revBridge = document.getElementById('revBridge').value;
+    const maxMem = document.getElementById('maxMem').value;
+    const maxCpus = document.getElementById('maxCpus').value;
+    const blacklist = document.getElementById('blacklist').value;
+    const denovo = document.getElementById('denovo').value;
+    const peakcall = document.getElementById('peakcall').value;
+    const adapterfile = document.getElementById('adapterfile').value;
+
+    // 5. Handle mapper index logic
+    let idxLine = (rnaT === dnaT) 
+        ? `    ${rnaT}_index = '${shared || ''}'`
+        : `    ${rnaT}_index = '${rnaI || ''}'\n    ${dnaT}_index = '${dnaI || ''}'`;
+
+    // 6. Build the configuration string using the extracted variables
+    const cfg = `includeConfig "\${projectDir}/conf/base.config"
 includeConfig "\${projectDir}/conf/modules.config"
 
 params {
     exp_type = '${exp}'
     procedure = 'old'
     split_by_chromosomes = false
-    dedup_tool = "${document.getElementById('dedupTool').value}"
-    trim_tool = "${document.getElementById('trimTool').value}"
+    dedup_tool = "${dedupTool}"
+    trim_tool = "${trimTool}"
     align_tool = '${rnaT}'
-    merge_pairedend_tool = '${document.getElementById('mergeTool').value}'
-    genome_fasta = '${document.getElementById('genomeFasta').value || 'GENOME_FASTA_PATH'}'
-    detect_strand_genes_list = '${document.getElementById('lineageGenes').value || 'LINEAGE_PATH'}'
+    merge_pairedend_tool = '${mergeTool}'
     rna_align_tool = '${rnaT}'
     dna_align_tool = '${dnaT}'
 ${idxLine}
     stages = 'annotation, splicing, normalize, peak_calling'
-    annot_BED = "${document.getElementById('annotBed').value || 'BED_PATH'}"
-    annot_GTF = '${document.getElementById('annotGtf').value || 'GTF_PATH'}'
+    genome_fasta = '${genome_fasta}'
+    detect_strand_genes_list = '${detect_strand_genes_list}'
+    annot_BED = "${annot_BED}"
+    annot_GTF = '${annot_GTF}'
     // RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------
-    bridge_processing = ${document.getElementById('bridgeProc').value}
-    debridge_tool = "${document.getElementById('debridgeTool').value}"
-    forward_bridge_seq = "${document.getElementById('fwdBridge').value}"
-    reverse_bridge_seq = "${document.getElementById('revBridge').value}"
+    bridge_processing = ${bridgeProc}
+    debridge_tool = "${debridgeTool}"
+    forward_bridge_seq = "${fwdBridge}"
+    reverse_bridge_seq = "${revBridge}"
     dna_part_processing = "*"
     rna_part_processing = "."
     max_mismatches = 1
     min_rna_dna_parts_length = 14
     description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""
-    max_memory = '${document.getElementById('maxMem').value}'
-    max_cpus = ${document.getElementById('maxCpus').value}
-    blacklist = '${document.getElementById('blacklist').value}'
-    de_novo_assembly = '${document.getElementById('denovo').value}'
-    peak_calling = '${document.getElementById('peakcall').value}'
-    adapters_file = '${document.getElementById('adapterfile').value}'
+    max_memory = '${maxMem}'
+    max_cpus = ${maxCpus}
+    blacklist = '${blacklist}'
+    de_novo_assembly = '${denovo}'
+    peak_calling = '${peakcall}'
+    adapters_file = '${adapterfile}'
     publish_dir_mode = 'copy'
 }
 
 process {
     withName: '.*' {
-        cpus = ${document.getElementById('maxCpus').value}
-        memory = ${document.getElementById('maxMem').value}
+        cpus = ${maxCpus}
+        memory = ${maxMem}
     }
 }
 
 flags = [
-    ${document.getElementById('dedupTool').value}: "${document.getElementById('dedupFlags').value}",
-    ${document.getElementById('trimTool').value}: "${document.getElementById('trimFlags').value}",
-    ${document.getElementById('mergeTool').value}: "${document.getElementById('mergeFlags').value}",
-    rna_align_options: "${document.getElementById('rnaOpts').value}",
-    dna_align_options: "${document.getElementById('dnaOpts').value}"
+    ${dedupTool}: "${dedupFlags}",
+    ${trimTool}: "${trimFlags}",
+    ${mergeTool}: "${mergeFlags}",
+    rna_align_options: "${rnaOpts}",
+    dna_align_options: "${dnaOpts}"
 ]`;
-        document.getElementById('configOutput').value = cfg;
+
+    // 7. Output the config to your textarea
+    document.getElementById('configOutput').value = cfg;
+    
+    // Safely update your global dirty state (prevents errors if configDirty isn't declared yet)
+    if (typeof configDirty !== 'undefined') {
         configDirty = false;
-        if (!silent) alert("Config generated successfully! Changes are now saved.");
     }
+    
+    if (!silent) {
+        alert("Config generated successfully! Changes are now saved.");
+    }
+}
 
     function downloadConfig() {
         if(!checkUnsaved()) return;
@@ -548,8 +592,8 @@ flags = [
         const dna = document.getElementById('ss_dna').value.trim();
         const desc = document.getElementById('ss_desc').value.trim();
 
-        if (!sample || (!rna && !dna)) {
-            alert("Warning: Sample ID and at least one FASTQ path (RNA or DNA) are required.");
+        if (!sample || !rna || !dna || !desc) {
+            alert("Warning: All fields should be filled; if RNA-seq is present link it in description fields of replicas");
             return;
         }
 
