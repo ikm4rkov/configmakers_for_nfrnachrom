@@ -157,9 +157,10 @@
         <h2 style="font-size:1.3rem; margin-top: 20px;">Pipeline Configuration</h2>
         <div class="grid-2">
             <div class="form-group"><label class="req">Genome FASTA Path</label><input type="text" id="genomeFasta" placeholder="/path/to/genome.fa"></div>
-            <div class="form-group"><label class="req">Ribosomal Lineage Genes List</label><input type="text" id="lineageGenes" placeholder="/path/to/genes.txt"></div>
-            <div class="form-group"><label class="req">Annotation BEDRC File</label><input type="text" id="annotBed" placeholder="/path/to/annot.bed"></div>
-            <div class="form-group"><label class="req">Annotation GTF File</label><input type="text" id="annotGtf" placeholder="/path/to/annot.gtf"></div>
+            <div class="form-group"><label class="req">Ribosomal protein genes list</label><input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab"></div>
+            <div class="form-group"><label class="req">Gene annotation BEDRC file</label><input type="text" id="annotBed" placeholder="/path/to/genes.bedrc"></div>
+            <div class="form-group"><label class="req">Gene annotation GTF file</label><input type="text" id="annotGtf" placeholder="/path/to/genes.gtf"></div>
+            <div class="form-group"><label class="req">Organism name</label><input type="text" id="species" placeholder=""></div>
             <div class="form-group">
                 <label class="req">RNA Alignment Tool</label>
                 <select id="rnaAlignTool" onchange="updateIndexFields(); applyMapperDefaults('rna')">
@@ -183,6 +184,10 @@
             <div class="grid-2" style="margin-bottom: 12px;">
                 <div class="form-group"><label>Forward bridge sequence</label><input type="text" id="fwdBridge"></div>
                 <div class="form-group"><label>Reverse bridge sequence</label><input type="text" id="revBridge"></div>
+                <div class="form-group"><label>Max mismatch number</label><input type="text" id="maxmm"></div>
+                <div class="form-group"><label>Min part length (both RNA- and DNA-)</label><input type="text" id="minlen"></div>
+                <div class="form-group"><label>DNA- part processing</label><input type="text" id="DnaEnds"></div>
+                <div class="form-group"><label>RNA- part processing</label><input type="text" id="RnaEnds"></div>
             </div>
             
             <div class="tool-param-row">
@@ -210,7 +215,7 @@
                 <div class="form-group"><label>Max CPUs per process</label><input type="text" id="maxCpus" value="16"></div>
             </div>
             <div class="grid-3">
-                <div class="form-group"><label>Gene blacklist</label><input type="text" id="blacklist" value="blacklist.csv"></div>
+                <div class="form-group"><label>Gene blacklist</label><input type="text" id="blacklist" value=""></div>
                 <div class="form-group"><label>De novo transcript assembly</label><input type="text" id="denovo" value="true"></div>
 		<div class="form-group"><label>Peak calling</label><input type="text" id="peakcall" value="true"></div>
 		<div class="form-group"><label>Adapter file</label><input type="text" id="adapterfile" value=""></div>
@@ -411,11 +416,11 @@ rnaseq_HFFc6_imargi_1,,SRR8206681_1.fastq.gz,SRR8206681_2.fastq.gz,tissue:"HFFc6
         const dna = document.getElementById('dnaAlignTool').value;
         const box = document.getElementById('indexPaths');
         if (rna && dna && rna === dna) {
-            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label>Alignment Index Path (calculates from genome FASTA if empty)</label><input type="text" id="sharedIdx" placeholder=""></div>`;
+            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label>Genome index Path (calculates from genome FASTA if empty)</label><input type="text" id="sharedIdx" placeholder=""></div>`;
         } else {
             box.innerHTML = `
-                <div class="form-group"><label class="req">RNA Alignment Index Path</label><input type="text" id="rnaIdx" placeholder="/path/to/rna/index"></div>
-                <div class="form-group"><label class="req">DNA Alignment Index Path</label><input type="text" id="dnaIdx" placeholder="/path/to/dna/index"></div>`;
+                <div class="form-group"><label">RNA genome Index Path</label><input type="text" id="rnaIdx" placeholder="/path/to/rna/index"></div>
+                <div class="form-group"><label">DNA genome Index Path</label><input type="text" id="dnaIdx" placeholder="/path/to/dna/index"></div>`;
         }
         box.querySelectorAll('input').forEach(i => i.addEventListener('input', markDirty));
         markDirty();
@@ -458,9 +463,10 @@ function generateConfig(silent = false) {
     const detect_strand_genes_list = document.getElementById('lineageGenes').value.trim();
     const annot_BED = document.getElementById('annotBed').value.trim();
     const annot_GTF = document.getElementById('annotGtf').value.trim();
+    const organism_name = document.getElementById('species').value.trim();
 
     // 2. Validate that all required fields are filled
-    if (!exp || !rnaT || !dnaT || !genome_fasta || !detect_strand_genes_list || !annot_BED || !annot_GTF) {
+    if (!exp || !rnaT || !dnaT || !genome_fasta || !detect_strand_genes_list || !annot_BED || !annot_GTF || !species) {
         alert("Warning: All required fields must be filled out.");
         return; // Stop execution early if validation fails
     }
