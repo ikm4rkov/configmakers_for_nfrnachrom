@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RNA-Chrom Pipeline Wizard — All-to-all (ATA)</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --primary-hover: #0056b3;
+            --secondary: #6c757d;
+            --danger: #dc3545;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --border: #dee2e6;
+            --hint: #6c757d;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px 15px 75px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h1 { text-align: center; color: #2c3e50; margin: 0 0 4px; font-size: 1.6rem; }
+        .subtitle { text-align: center; color: var(--hint); margin-bottom: 20px; font-size: 0.85rem; }
+        
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 10px; cursor: pointer; background: none; border: none;
+            font-size: 14px; font-weight: 600; color: var(--secondary); transition: 0.3s; position: relative;
+        }
+        .tab-btn.active { color: var(--primary); }
+        .tab-btn.active::after {
+            content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: var(--primary);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Forms & Grids */
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 0.88rem; }
+        label.req::after { content: ' *'; color: var(--danger); }
+        input[type="text"], select, textarea {
+            width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 5px;
+            font-size: 13px; box-sizing: border-box; transition: border 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,123,255,0.15);
+        }
+        input:disabled, select:disabled { background: #e9ecef; cursor: not-allowed; opacity: 0.8; }
+        textarea { font-family: 'Courier New', monospace; min-height: 260px; background: #f8f9fa; resize: vertical; }
+        .hint { color: var(--hint); font-size: 0.82rem; margin-top: 3px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        /* Tool-Param Rows (Advanced) */
+        .tool-param-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e9ecef;
+        }
+        .tool-param-row label { font-size: 0.82rem; margin-bottom: 3px; }
+
+        /* Buttons */
+        .btn {
+            padding: 9px 16px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 0.88rem;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #bb2d3b; }
+        .btn-outline { background: transparent; border: 1px dashed var(--secondary); color: var(--secondary); }
+        .btn-outline:hover { background: #e9ecef; }
+        .btn-group { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        
+        /* Navigation Footer */
+        .nav-footer {
+            position: fixed; bottom: 0; left: 0; right: 0; background: white;
+            border-top: 1px solid var(--border); padding: 12px 20px;
+            display: flex; justify-content: center; gap: 12px; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); z-index: 100;
+        }
+
+        /* Samplesheet */
+        .example-block { background: #fff3cd; border: 1px solid #ffeeba; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+        pre { background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; margin: 6px 0 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.88rem; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        th { background: #e9ecef; }
+        .row-actions button { padding: 3px 7px; font-size: 0.78rem; }
+
+        /* Advanced Toggle */
+        .adv-toggle { display: block; width: 100%; margin: 16px 0; text-align: center; }
+        .advanced-section { display: none; margin-top: 12px; }
+        .advanced-section.show { display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>RNA-Chrom Pipeline Wizard</h1>
+    <div class="subtitle">All-to-all (ATA) edition · linear setup 1 → 2 → 3</div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="1">1. Experiment & Config</button>
+        <button class="tab-btn" data-tab="2">2. Samplesheet</button>
+        <button class="tab-btn" data-tab="3">3. Launch Command</button>
+    </div>
+
+    <!-- TAB 1: CONFIG -->
+    <div id="tab1" class="tab-content active">
+        <h2 style="font-size:1.3rem; margin-top:0;">Experiment Setup</h2>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Experiment Group</label>
+                <input type="text" value="All-to-all (ATA)" disabled>
+            </div>
+            <div class="form-group">
+                <label class="req">Experiment Method / Type</label>
+                <select id="expMethod" onchange="applyPresets()">
+                    <option value="">— Select Method —</option>
+                    <option value="grid">GRID-seq</option>
+                    <option value="imargi">MARGI / iMARGI</option>
+                    <option value="char">ChAR-seq</option>
+                    <option value="redc">Red-C / RedChIP</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Chromatin Potential Analysis</label>
+                <select id="chromPot" onchange="updateSampleTypeOptions(); syncSamplesheetForChromPot(); markDirty()"><option value="false">No</option><option value="true">Yes</option></select>
+                <div class="hint">Enables RNA-seq integration for chromatin state analysis.</div>
+            </div>
+            <div class="form-group">
+                <label>Split RNA-DNA Parts (pre-processed)</label>
+                <select id="splitParts" onchange="applyPresets()"><option value="false">No</option><option value="true">Yes</option></select>
+                <div class="hint">Only enable if FASTQs are already separated into RNA/DNA reads.</div>
+            </div>
+            <div class="form-group">
+                <label>Sequencing Data Type</label>
+                <select id="seqType"><option value="PE">Paired-end (PE)</option><option value="SE">Single-end (SE)</option></select>
+            </div>
+        </div>
+
+        <h2 style="font-size:1.3rem; margin-top: 20px;">Pipeline Configuration</h2>
+        <div class="grid-2">
+            <div class="form-group"><label class="req">Genome FASTA Path</label><input type="text" id="genomeFasta" placeholder="/path/to/genome.fa"></div>
+            <div class="form-group"><label class="req">Ribosomal protein genes list</label><input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab"></div>
+            <div class="form-group"><label class="req">Gene annotation BEDRC file</label><input type="text" id="annotBed" placeholder="/path/to/genes.bedrc"></div>
+            <div class="form-group"><label class="req">Gene annotation GTF file</label><input type="text" id="annotGtf" placeholder="/path/to/genes.gtf"></div>
+            <div class="form-group"><label class="req">Organism name</label><input type="text" id="species" placeholder=""></div>
+        </div>
+
+        <button class="btn btn-outline adv-toggle" onclick="toggleAdvanced()">Show Advanced Options</button>
+        <div id="advancedOpts" class="advanced-section">
+            <p class="hint">Advanced options include alignment tools and genome indexes. The defaults are suitable for most runs.</p>
+            <div class="grid-2" style="margin-bottom: 12px;">
+                <div class="form-group">
+                    <label>RNA Alignment Tool</label>
+                    <select id="rnaAlignTool" onchange="updateIndexFields(); applyMapperDefaults('rna')">
+                        <option value="hisat2">hisat2</option><option value="bwa_mem">bwa mem</option><option value="bwa_aln">bwa aln</option>
+                        <option value="bowtie2">bowtie2</option><option value="star">star</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>DNA Alignment Tool</label>
+                    <select id="dnaAlignTool" onchange="updateIndexFields(); applyMapperDefaults('dna')">
+                        <option value="hisat2">hisat2</option><option value="bwa_mem">bwa mem</option><option value="bwa_aln">bwa aln</option>
+                        <option value="bowtie2">bowtie2</option><option value="star">star</option>
+                    </select>
+                </div>
+            </div>
+            <div id="indexPaths" class="grid-2" style="margin-top: 5px;"></div>
+            <p class="hint">Note: Bridge sequence determined as: <code>5'-DNA part - forward bridge - RNA part-3'</code></p>
+            <div class="grid-2" style="margin-bottom: 12px;">
+                <div class="form-group"><label>Forward bridge sequence</label><input type="text" id="fwdBridge"></div>
+                <div class="form-group"><label>Reverse bridge sequence</label><input type="text" id="revBridge"></div>
+                <div class="form-group"><label>Max mismatch number</label><input type="text" id="maxmm"></div>
+                <div class="form-group"><label>Min part length (both RNA- and DNA-)</label><input type="text" id="minlen"></div>
+                <div class="form-group"><label>DNA- part processing</label><input type="text" id="DnaEnds"></div>
+                <div class="form-group"><label>RNA- part processing</label><input type="text" id="RnaEnds"></div>
+            </div>
+            
+            <div class="tool-param-row">
+                <div><label>De-bridge Tool</label><select id="debridgeTool"><option value="bitap">bitap (default)</option><option value="chartools">chartools</option></select></div>
+                <div><label>Bridge Processing</label><select id="bridgeProc"><option value="true">true</option><option value="false">false</option></select></div>
+            </div>
+            <div class="tool-param-row">
+                <div><label>Deduplication Tool</label><select id="dedupTool" onchange="applyToolDefaults('dedup')"><option value="fastq-dupaway">fastq-dupaway</option><option value="fastuniq">fastuniq</option></select></div>
+                <div><label>Dedup Flags</label><input type="text" id="dedupFlags"></div>
+            </div>
+            <div class="tool-param-row">
+                <div><label>Trimming Tool</label><select id="trimTool" onchange="applyToolDefaults('trim')"><option value="fastp">fastp</option><option value="trimmomatic">trimmomatic</option><option value="bbduk">bbduk</option><option value="cutadapt">cutadapt</option></select></div>
+                <div><label>Trim Flags</label><input type="text" id="trimFlags"></div>
+            </div>
+            <div class="tool-param-row">
+                <div><label>Paired-End Merge Tool</label><select id="mergeTool" onchange="applyToolDefaults('merge')"><option value="pear">pear</option><option value="bbmerge">bbmerge</option></select></div>
+                <div><label>Merge Flags</label><input type="text" id="mergeFlags"></div>
+            </div>
+            <div class="tool-param-row">
+                <div><label>RNA Alignment Options</label><input type="text" id="rnaOpts" placeholder="mapper-dependent"></div>
+                <div><label>DNA Alignment Options</label><input type="text" id="dnaOpts" placeholder="mapper-dependent"></div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group"><label>Max memory per process</label><input type="text" id="maxMem" value="128.GB"></div>
+                <div class="form-group"><label>Max CPUs per process</label><input type="text" id="maxCpus" value="16"></div>
+            </div>
+            <div class="grid-3">
+                <div class="form-group"><label>Gene blacklist</label><input type="text" id="blacklist" value=""></div>
+                <div class="form-group"><label>De novo transcript assembly</label><input type="text" id="denovo" value="true"></div>
+		<div class="form-group"><label>Peak calling</label><input type="text" id="peakcall" value="true"></div>
+		<div class="form-group"><label>Adapter file</label><input type="text" id="adapterfile" value=""></div>
+            </div>
+        </div>
+
+        <h3 style="font-size:1.2rem; margin-top: 18px;">nextflow.config Output</h3>
+        <textarea id="configOutput" placeholder="Click 'Generate nextflow.config' to populate..."></textarea>
+        <div class="btn-group">
+            <button class="btn btn-secondary">Load Config File</button>
+            <button class="btn btn-primary" onclick="generateConfig()">Generate nextflow.config</button>
+            <button class="btn btn-secondary" onclick="downloadConfig()">Download config</button>
+        </div>
+    </div>
+
+    <!-- TAB 2: SAMPLESHEET -->
+    <div id="tab2" class="tab-content">
+        <h2 style="font-size:1.3rem; margin-top:0;">Samplesheet Builder</h2>
+        <div class="example-block">
+            <h4 style="margin:0 0 5px;">All-to-all (ATA) methods (e.g., MARGI, RADICL-seq)</h4>
+            <p style="margin:0 0 5px;">A simple ATA samplesheet should include the RNA and DNA parts of the experiment:</p>
+            <p style="margin:0 0 5px;"><strong>All FASTQ entries must be absolute full paths.</strong> Example:</p>
+            <pre>sample,rna,dna
+HFFc6_imargi_1,/data/fastq/SRR8206679_1.fastq.gz,/data/fastq/SRR8206679_2.fastq.gz
+HFFc6_imargi_1,/data/fastq/SRR8206680_1.fastq.gz,/data/fastq/SRR8206680_2.fastq.gz</pre>
+        </div>
+        <div class="example-block">
+            <h4 style="margin:0 0 5px;">ATA with RNA-seq control</h4>
+            <p style="margin:0 0 5px;">For ATA experiments with matching RNA-seq data, use the following format:</p>
+            <p style="margin:0 0 5px;"><strong>All FASTQ entries must be absolute full paths.</strong> Example:</p>
+            <pre>sample,rna,dna,description
+HFFc6_imargi_1,/data/fastq/SRR8206679_1.fastq.gz,/data/fastq/SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:rnaseq_HFFc6
+HFFc6_imargi_1,/data/fastq/SRR8206680_1.fastq.gz,/data/fastq/SRR8206680_2.fastq.gz,tissue:"HFFc6";rnaseq:rnaseq_HFFc6
+rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_2.fastq.gz,tissue:"HFFc6"</pre>
+        </div>
+
+        <div class="form-group">
+            <label class="req">Global Experiment Name (only Latin symbols, digits and underscore _ are allowed)</label>
+            <input type="text" id="globalExpName" placeholder="e.g., HFFc6_imargi">
+            <div class="hint" id="expNameHint">Single experiment per sheet. RNA-seq rows will automatically get the `rnaseq_` prefix.</div>
+        </div>
+
+        <div class="grid-2" style="background:#f8f9fa; padding:12px; border-radius:6px; margin-bottom:12px;">
+            <div class="form-group"><label>Sample ID (auto-filled)</label><input type="text" id="ss_sample" readonly></div>
+            <div class="form-group"><label>Row Type</label><select id="ss_type"><option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option></select></div>
+            <div class="form-group"><label class="req">Forward (Paired-end data)/ RNA (no bridge split data) FASTQ</label><input type="text" id="ss_rna" placeholder="/absolute/path/to/sample_R1.fastq.gz"><div class="hint">Absolute full path required, e.g. /data/fastq/sample_R1.fastq.gz</div></div>
+            <div class="form-group"><label class="req">Reverse complement (Paired-end data)/ DNA (no bridge split data) FASTQ</label><input type="text" id="ss_dna" placeholder="/absolute/path/to/sample_R2.fastq.gz"><div class="hint">Absolute full path required, e.g. /data/fastq/sample_R2.fastq.gz</div></div>
+            <div class="form-group" style="grid-column: span 2;"><label id="ssDescLabel">Description</label><input type="text" id="ss_desc" placeholder='e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'></div>
+        </div>
+        <button class="btn btn-primary" onclick="addSampleRow()">+ Add Sample Row</button>
+
+        <table id="ssTable">
+            <thead><tr><th>Type</th><th>Sample</th><th>RNA</th><th>DNA</th><th>Description</th><th>Action</th></tr></thead>
+            <tbody id="ssBody"></tbody>
+        </table>
+
+        <h3 style="font-size:1.2rem; margin-top: 18px;">CSV Output</h3>
+        <textarea id="csvOutput" placeholder="Click 'Generate CSV' to populate..." style="min-height: 140px;"></textarea>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="generateCSV()">Generate CSV</button>
+            <button class="btn btn-secondary" onclick="downloadCSV()">Download samplesheet.csv</button>
+            <button class="btn btn-danger" onclick="clearSamplesheet()">Clear All</button>
+        </div>
+    </div>
+
+    <!-- TAB 3: LAUNCH COMMAND -->
+    <div id="tab3" class="tab-content">
+        <h2 style="font-size:1.3rem; margin-top:0;">Pipeline Launch Command</h2>
+        <p class="hint">Build the exact command to run your pipeline.</p>
+        
+        <div class="grid-2">
+            <div>
+                <div class="form-group"><label class="req">Pipeline path</label><input type="text" id="launch_pipeline" placeholder="/gpfs/user/nf-rnachrom/"></div>
+                <div class="form-group">
+                    <label class="req">Container profile</label>
+                    <select id="launch_profile">
+                        <option value="singularity">singularity (recommended)</option>
+                        <option value="docker">docker</option>
+                        <option value="conda">conda</option>
+                        <option value="local">local (no container)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="req">Config file path</label><input type="text" id="launch_config" placeholder="/path/to/your_config.groovy"></div>
+                <div class="form-group"><label class="req">Samplesheet path (--input)</label><input type="text" id="launch_input" placeholder="/path/to/samplesheet.csv"></div>
+            </div>
+            <div>
+                <div class="form-group">
+                    <label>Experiment Type (auto-filled)</label>
+                    <input type="text" id="launch_exp_type" readonly placeholder="Syncs from Config tab">
+                </div>
+                <div class="form-group"><label class="req">Work directory</label><input type="text" id="launch_work" value="work"></div>
+                <div class="form-group"><label class="req">Output directory</label><input type="text" id="launch_outdir" value="results"></div>
+            </div>
+        </div>
+
+        <div class="btn-group" style="margin-top: 15px;">
+            <button class="btn btn-primary" onclick="generateCommand()">Generate Command</button>
+            <button class="btn btn-secondary" onclick="downloadCommand()">Download command.txt</button>
+            <button class="btn btn-primary" style="background:#28a745;" onclick="downloadAllFiles()">Download All Files</button>
+        </div>
+        <textarea id="cmdOutput" placeholder="Run this command in your terminal..." style="margin-top: 12px;"></textarea>
+        <p class="hint" style="margin-top:8px;">Note: Your browser may prompt to allow multiple downloads when using "Download All Files".</p>
+    </div>
+</div>
+
+<!-- NAVIGATION FOOTER -->
+<div class="nav-footer">
+    <button class="btn btn-danger" onclick="resetForm()">Reset Form</button>
+    <button class="btn btn-secondary" id="btnBack" onclick="goBack()" disabled>← Back</button>
+    <button class="btn btn-primary" id="btnNext" onclick="goNext()">Next →</button>
+</div>
+
+<script>
+    // ===== PRESETS =====
+    const bridgePresets = {
+      grid: {
+        unsplit: { dna_part: '*s[AG|AGCT]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'GTTCGGTGTGTG', rev: 'CACACACCGAAC', max_mm: 1, min_len: 14 },
+        split: { dna_part: '*', rna_part: '.', bridge_proc: false }
+      },
+      imargi: { dna_part: '*', rna_part: '-[2].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
+      char: {
+        unsplit: { dna_part: '*s[GATC|GATC]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'CTTGGACGCCGGTTTTTTT', rev: 'AAAAAAACCGGCGTCCAAG', max_mm: 1, min_len: 14 },
+        split: { dna_part: '*', rna_part: '.', bridge_proc: false }
+      },
+      redc: { bridge_proc: false, fwd: '', rev: '', debridge: 'bitap' }
+    };
+
+    const mapperDefaults = {
+      hisat2: { 
+        rna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --dta --no-temp-splicesite', 
+        dna: '-k 10 --new-summary --max-seeds 20 --score-min L,0,-0.2 --bowtie2-dp 0 --no-spliced-alignment' 
+      },
+      bwa_mem: { rna: '-Y -a -k 17 -T 1', dna: '-Y -a -k 18 -T 1' },
+      bwa_aln: { rna: '', dna: '' },
+      bowtie2: { 
+        rna: '--end-to-end -k 10 --no-1mm-upfront -D 15 -R 2 -i S,1,0.50 -N 0 -L 19 --score-min L,-0.6,-0.6', 
+        dna: '--end-to-end -k 10 --no-1mm-upfront -D 15 -R 2 -i S,1,1.15 -N 0 -L 19 --score-min L,-0.6,-0.6' 
+      },
+      star: { 
+        rna: '--outSAMtype BAM Unsorted --outSAMstrandField None --outSAMattributes NM --outSAMunmapped Within --outSAMmultNmax 10 --outFilterMultimapNmax 100 --outReadsUnmapped None --outMultimapperOrder Old_2.4 --alignIntronMin 20 --alignEndsType EndToEnd --outFilterScoreMinOverLread 0.66', 
+        dna: '--outSAMtype BAM Unsorted --outSAMstrandField None --outSAMattributes NM --outSAMunmapped Within --outSAMmultNmax 10 --outFilterMultimapNmax 100 --outReadsUnmapped None --outMultimapperOrder Old_2.4 --alignIntronMin 20 --alignEndsType EndToEnd --outFilterScoreMinOverLread 0.66 --alignIntronMax 19' 
+      }
+    };
+
+    const toolOptionDefaults = {
+      dedup: { 'fastq-dupaway': '--format fastq --compare-seq tight', 'fastuniq': '' },
+      trim: { 'fastp': '-5 --correction --cut_window_size 5 --cut_mean_quality 26', 'trimmomatic': '', 'bbduk': '', 'cutadapt': '' },
+      merge: { 'pear': '-p 0.01 -v 20 -n 50', 'bbmerge': '' }
+    };
+
+    // ===== STATE =====
+    let currentTab = 1;
+    let configDirty = false;
+    let samplesheetRows = [];
+    let lockedExpName = '';
+
+    // ===== INIT & LISTENERS =====
+    document.addEventListener('DOMContentLoaded', () => {
+        updateIndexFields();
+        applyToolDefaults('dedup'); applyToolDefaults('trim'); applyToolDefaults('merge');
+        applyMapperDefaults('rna'); applyMapperDefaults('dna');
+        updateSampleTypeOptions();
+        syncSampleIdField();
+        updateDescriptionRequirement();
+        
+        document.querySelectorAll('#tab1 input, #tab1 select, #tab1 textarea').forEach(el => {
+            if(el.id !== 'configOutput') {
+                el.addEventListener('input', markDirty);
+                el.addEventListener('change', markDirty);
+            }
+        });
+
+        const expInput = document.getElementById('globalExpName');
+        expInput.addEventListener('input', function() {
+            // Enforce the documented identifier grammar: Latin letters, digits and "_".
+            this.value = this.value.replace(/[^A-Za-z0-9_]/g, '');
+            if (samplesheetRows.length > 0) {
+                this.value = lockedExpName;
+            } else {
+                lockedExpName = this.value.trim();
+            }
+            syncSampleIdField();
+            updateDescriptionRequirement();
+        });
+        document.getElementById('ss_type').addEventListener('change', updateDescriptionRequirement);
+        document.getElementById('ss_desc').addEventListener('input', updateDescriptionRequirement);
+    });
+
+    function markDirty() { configDirty = true; }
+    function checkUnsaved() {
+        if (configDirty) {
+            alert("Warning: You have unsaved settings in the configuration form. Please click 'Generate nextflow.config' to apply your changes before proceeding.");
+            return false;
+        }
+        return true;
+    }
+
+    // ===== UI HELPERS =====
+    function toggleAdvanced() {
+        const sec = document.getElementById('advancedOpts');
+        const btn = document.querySelector('.adv-toggle');
+        sec.classList.toggle('show');
+        btn.textContent = sec.classList.contains('show') ? 'Hide Advanced Options' : 'Show Advanced Options';
+    }
+
+    function updateIndexFields() {
+        const rna = document.getElementById('rnaAlignTool').value;
+        const dna = document.getElementById('dnaAlignTool').value;
+        const box = document.getElementById('indexPaths');
+        if (rna && dna && rna === dna) {
+            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label>Genome index Path (calculates from genome FASTA if empty)</label><input type="text" id="sharedIdx" placeholder=""></div>`;
+        } else {
+            box.innerHTML = `
+                <div class="form-group"><label">RNA genome Index Path</label><input type="text" id="rnaIdx" placeholder="/path/to/rna/index"></div>
+                <div class="form-group"><label">DNA genome Index Path</label><input type="text" id="dnaIdx" placeholder="/path/to/dna/index"></div>`;
+        }
+        box.querySelectorAll('input').forEach(i => i.addEventListener('input', markDirty));
+        markDirty();
+    }
+
+    function applyPresets() {
+        const method = document.getElementById('expMethod').value;
+        const split = document.getElementById('splitParts').value === 'true';
+        const preset = bridgePresets[method];
+        if (!preset) return;
+
+        const cfg = (preset.unsplit && !split) ? preset.unsplit : (preset.split || preset);
+        document.getElementById('fwdBridge').value = cfg.fwd || '';
+        document.getElementById('revBridge').value = cfg.rev || '';
+        document.getElementById('bridgeProc').value = (method === 'imargi') ? 'false' : String(cfg.bridge_proc ?? false);
+        document.getElementById('bridgeProc').disabled = (method === 'imargi');
+        document.getElementById('debridgeTool').value = cfg.debridge || 'bitap';
+        markDirty();
+    }
+
+    function applyMapperDefaults(type) {
+        const tool = document.getElementById(type === 'rna' ? 'rnaAlignTool' : 'dnaAlignTool').value;
+        const def = mapperDefaults[tool]?.[type] || '';
+        document.getElementById(type === 'rna' ? 'rnaOpts' : 'dnaOpts').value = def;
+        markDirty();
+    }
+
+    function applyToolDefaults(cat) {
+        const tool = document.getElementById(cat + 'Tool').value;
+        document.getElementById(cat + 'Flags').value = toolOptionDefaults[cat]?.[tool] || '';
+        markDirty();
+    }
+
+    // ===== CONFIG GENERATION =====
+function generateConfig(silent = false) {
+    // 1. Extract and trim values from the REQUIRED HTML fields
+    const exp = document.getElementById('expMethod').value.trim();
+    const rnaT = document.getElementById('rnaAlignTool').value.trim();
+    const dnaT = document.getElementById('dnaAlignTool').value.trim();
+    const genome_fasta = document.getElementById('genomeFasta').value.trim();
+    const detect_strand_genes_list = document.getElementById('lineageGenes').value.trim();
+    const annot_BED = document.getElementById('annotBed').value.trim();
+    const annot_GTF = document.getElementById('annotGtf').value.trim();
+    const organism_name = document.getElementById('species').value.trim();
+
+    // 2. Validate that all required fields are filled
+    if (!exp || !rnaT || !dnaT || !genome_fasta || !detect_strand_genes_list || !annot_BED || !annot_GTF || !organism_name) {
+        alert("Warning: All required fields must be filled out.");
+        return; // Stop execution early if validation fails
+    }
+
+    // 3. Extract OPTIONAL index fields (THESE WERE MISSING IN YOUR SNIPPET, CAUSING THE CRASH)
+    const shared = document.getElementById('sharedIdx')?.value.trim() || '';
+    const rnaI = document.getElementById('rnaIdx')?.value.trim() || '';
+    const dnaI = document.getElementById('dnaIdx')?.value.trim() || '';
+
+    // 4. Extract other advanced/optional fields to keep the template clean
+    const dedupTool = document.getElementById('dedupTool').value;
+    const dedupFlags = document.getElementById('dedupFlags').value;
+    const trimTool = document.getElementById('trimTool').value;
+    const trimFlags = document.getElementById('trimFlags').value;
+    const mergeTool = document.getElementById('mergeTool').value;
+    const mergeFlags = document.getElementById('mergeFlags').value;
+    const rnaOpts = document.getElementById('rnaOpts').value;
+    const dnaOpts = document.getElementById('dnaOpts').value;
+    const bridgeProc = (document.getElementById('expMethod').value === 'imargi') ? 'false' : document.getElementById('bridgeProc').value;
+    const debridgeTool = document.getElementById('debridgeTool').value;
+    const fwdBridge = document.getElementById('fwdBridge').value;
+    const revBridge = document.getElementById('revBridge').value;
+    const maxMem = document.getElementById('maxMem').value;
+    const maxCpus = document.getElementById('maxCpus').value;
+    const blacklist = document.getElementById('blacklist').value;
+    const denovo = document.getElementById('denovo').value;
+    const peakcall = document.getElementById('peakcall').value;
+    const adapterfile = document.getElementById('adapterfile').value;
+
+    // 5. Handle mapper index logic
+    let idxLine = (rnaT === dnaT) 
+        ? `    ${rnaT}_index = '${shared || ''}'`
+        : `    ${rnaT}_index = '${rnaI || ''}'\n    ${dnaT}_index = '${dnaI || ''}'`;
+
+    // 6. Build the configuration string using the extracted variables
+    const cfg = `includeConfig "\${projectDir}/conf/base.config"
+includeConfig "\${projectDir}/conf/modules.config"
+
+params {
+    exp_type = '${exp}'
+    procedure = 'old'
+    split_by_chromosomes = false
+    dedup_tool = "${dedupTool}"
+    trim_tool = "${trimTool}"
+    ${rnaT === dnaT ? `align_tool = '${rnaT}'\n` : ''}    merge_pairedend_tool = '${mergeTool}'
+    rna_align_tool = '${rnaT}'
+    dna_align_tool = '${dnaT}'
+${idxLine}
+    stages = 'annotation, splicing, normalize, peak_calling'
+    genome_fasta = '${genome_fasta}'
+    detect_strand_genes_list = '${detect_strand_genes_list}'
+    annot_BED = "${annot_BED}"
+    annot_GTF = '${annot_GTF}'
+    // RESTRICTION SITES & BRIDGE SEARCH: --------------------------------------------------------------------
+    bridge_processing = ${bridgeProc}
+    debridge_tool = "${debridgeTool}"
+    forward_bridge_seq = "${fwdBridge}"
+    reverse_bridge_seq = "${revBridge}"
+    dna_part_processing = "*"
+    rna_part_processing = "."
+    max_mismatches = 1
+    min_rna_dna_parts_length = 14
+    description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""
+    max_memory = '${maxMem}'
+    max_cpus = ${maxCpus}
+    blacklist = '${blacklist}'
+    de_novo_assembly = '${denovo}'
+    peak_calling = '${peakcall}'
+    adapters_file = '${adapterfile}'
+    publish_dir_mode = 'copy'
+}
+
+process {
+    withName: '.*' {
+        cpus = ${maxCpus}
+        memory = ${maxMem}
+    }
+}
+
+flags = [
+    ${dedupTool}: "${dedupFlags}",
+    ${trimTool}: "${trimFlags}",
+    ${mergeTool}: "${mergeFlags}",
+    rna_align_options: "${rnaOpts}",
+    dna_align_options: "${dnaOpts}"
+]`;
+
+    // 7. Output the config to your textarea
+    document.getElementById('configOutput').value = cfg;
+    
+    // Safely update your global dirty state (prevents errors if configDirty isn't declared yet)
+    if (typeof configDirty !== 'undefined') {
+        configDirty = false;
+    }
+    
+    if (!silent) {
+        alert("Config generated successfully! Changes are now saved.");
+    }
+}
+
+    function downloadConfig() {
+        if(!checkUnsaved()) return;
+        const blob = new Blob([document.getElementById('configOutput').value], {type: 'text/plain'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nextflow.config'; a.click();
+    }
+
+    // ===== SAMPLESHEET LOGIC =====
+    function getGlobalExpName() {
+        return document.getElementById('globalExpName').value.trim();
+    }
+
+    function syncSampleIdField() {
+        document.getElementById('ss_sample').value = getGlobalExpName();
+    }
+
+    function updateSampleTypeOptions() {
+        const chromPot = document.getElementById('chromPot').value === 'true';
+        const type = document.getElementById('ss_type');
+        if (!chromPot) {
+            type.innerHTML = '<option value="exp">Experimental</option>';
+            type.value = 'exp';
+            type.disabled = true;
+        } else {
+            type.innerHTML = '<option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option>';
+            type.disabled = false;
+        }
+        updateDescriptionRequirement();
+        syncSampleIdField();
+    }
+
+    function updateDescriptionRequirement() {
+        const chromPot = document.getElementById('chromPot').value === 'true';
+        const label = document.getElementById('ssDescLabel');
+        const input = document.getElementById('ss_desc');
+        const required = chromPot;
+        label.classList.toggle('req', required);
+        label.textContent = required ? 'Description' : 'Description';
+        input.placeholder = required
+            ? 'e.g., tissue:"HFFc6";rnaseq:rnaseq_HFFc6'
+            : 'Optional; if provided, it will be normalized when Chromatin Potential is enabled';
+    }
+
+    function normalizeDescription(desc) {
+        const chromPot = document.getElementById('chromPot').value === 'true';
+        const globalName = getGlobalExpName();
+        let value = desc.trim();
+
+        if (chromPot && globalName) {
+            const suffix = `;rnaseq:rnaseq_${globalName}`;
+            // Remove any previous generated suffix, then append exactly one current suffix.
+            value = value.replace(/;rnaseq:rnaseq_[A-Za-z0-9_]+$/i, '');
+            value = value ? `${value}${suffix}` : suffix.slice(1);
+        }
+        return value;
+    }
+
+    function syncSamplesheetForChromPot() {
+        const chromPot = document.getElementById('chromPot').value === 'true';
+        const globalName = getGlobalExpName();
+        if (!globalName) return;
+
+        samplesheetRows.forEach(r => {
+            if (chromPot) {
+                r.desc = normalizeDescription(r.desc || '');
+            } else {
+                r.desc = (r.desc || '').replace(/;rnaseq:rnaseq_[A-Za-z0-9_]+$/i, '');
+            }
+        });
+        renderSamplesheet();
+        updateDescriptionRequirement();
+    }
+
+    function updateExpNameLock() {
+        const input = document.getElementById('globalExpName');
+        const hint = document.getElementById('expNameHint');
+        if (samplesheetRows.length > 0) {
+            input.disabled = true;
+            input.title = "Locked: Delete all sample rows to change the experiment name.";
+            hint.textContent = "Experiment name is locked because samples exist. Clear rows to edit.";
+            hint.style.color = "var(--danger)";
+        } else {
+            input.disabled = false;
+            input.title = "";
+            hint.textContent = "Single experiment per sheet. RNA-seq rows will automatically get the `rnaseq_` prefix.";
+            hint.style.color = "var(--hint)";
+        }
+        syncSampleIdField();
+    }
+
+    function addSampleRow() {
+        const globalName = getGlobalExpName();
+        const type = document.getElementById('ss_type').value;
+        const rna = document.getElementById('ss_rna').value.trim();
+        const dna = document.getElementById('ss_dna').value.trim();
+        const desc = normalizeDescription(document.getElementById('ss_desc').value);
+
+        if (!globalName) {
+            alert("Please enter a Global Experiment Name before adding samples.");
+            return;
+        }
+        if (!/^[A-Za-z0-9_]+$/.test(globalName)) {
+            alert("Global Experiment Name may contain only Latin letters, digits and underscore (_).");
+            return;
+        }
+        if (!rna || !dna || (document.getElementById('chromPot').value === 'true' && !desc)) {
+            alert("Warning: RNA and DNA FASTQ fields are required; Description is also required when Chromatin Potential Analysis is enabled.");
+            return;
+        }
+        if (!isAbsolutePath(rna) || !isAbsolutePath(dna)) {
+            alert("FASTQ paths must be absolute full paths, e.g. /data/fastq/sample_R1.fastq.gz.");
+            return;
+        }
+
+        if (samplesheetRows.length === 0) lockedExpName = globalName;
+
+        // Sample IDs are derived from the single global experiment name.
+        samplesheetRows.push({ type, sample: globalName, rna, dna, desc });
+        renderSamplesheet();
+        updateExpNameLock();
+        ['ss_rna','ss_dna','ss_desc'].forEach(id => document.getElementById(id).value = '');
+        syncSampleIdField();
+    }
+
+    function isAbsolutePath(path) {
+        // POSIX absolute path; also accept Windows drive-letter absolute paths.
+        return /^\/(?:[^/].*)?$/.test(path) || /^[A-Za-z]:[\\/].*/.test(path);
+    }
+
+    function renderSamplesheet() {
+        const tbody = document.getElementById('ssBody');
+        tbody.innerHTML = '';
+        samplesheetRows.forEach((r, i) => {
+            tbody.innerHTML += `<tr>
+                <td>${r.type === 'exp' ? 'Experimental' : 'RNA-seq'}</td>
+                <td>${r.type === 'rnaseq' ? `rnaseq_${r.sample}` : r.sample}</td>
+                <td>${r.rna || '-'}</td><td>${r.dna || '-'}</td><td>${r.desc || '-'}</td>
+                <td class="row-actions"><button class="btn btn-danger" onclick="removeRow(${i})">Remove</button></td>
+            </tr>`;
+        });
+    }
+
+    function removeRow(i) {
+        samplesheetRows.splice(i, 1);
+        renderSamplesheet();
+        updateExpNameLock();
+    }
+
+    function clearSamplesheet() {
+        samplesheetRows = [];
+        renderSamplesheet();
+        document.getElementById('csvOutput').value = '';
+        updateExpNameLock();
+        syncSampleIdField();
+    }
+
+    function generateCSV() {
+        if (samplesheetRows.length === 0) { alert("No samples added."); return; }
+        let csv = 'sample,rna,dna,description\n';
+        samplesheetRows.forEach(r => {
+            const name = r.type === 'rnaseq' ? `rnaseq_${r.sample}` : r.sample;
+            csv += `${name},${r.rna},${r.dna},${r.desc}\n`;
+        });
+        document.getElementById('csvOutput').value = csv;
+    }
+
+    // ===== LAUNCH COMMAND =====
+    function generateCommand() {
+        const p = document.getElementById('launch_pipeline').value || '.';
+        const prof = document.getElementById('launch_profile').value;
+        const cfg = document.getElementById('launch_config').value || 'nextflow.config';
+        const inp = document.getElementById('launch_input').value || 'samplesheet.csv';
+        const exp = document.getElementById('expMethod').value || 'ata';
+        const work = document.getElementById('launch_work').value || 'work';
+        const out = document.getElementById('launch_outdir').value || 'results';
+
+        document.getElementById('launch_exp_type').value = `--exp_type ${exp}`;
+
+        let args = [`nextflow run ${p}/main.nf`];
+        if (prof !== 'local') args.push(`-profile ${prof}`);
+        args.push(`-c ${cfg}`);
+        args.push(`--input ${inp}`);
+        args.push(`--exp_type ${exp}`);
+        args.push(`-w ${work}`);
+        args.push(`--outdir ${out}`);
+
+        document.getElementById('cmdOutput').value = args.join(' \\\n  ');
+    }
+
+    function downloadCommand() {
+        const cmd = document.getElementById('cmdOutput').value;
+        if(!cmd) { alert("Generate command first."); return; }
+        const blob = new Blob([cmd], {type: 'text/plain'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'command.txt'; a.click();
+    }
+
+    function downloadAllFiles() {
+        if (samplesheetRows.length === 0) {
+            alert("Warning: Cannot download all files. Please add at least one sample row in the Samplesheet tab.");
+            return;
+        }
+        
+        // Generate missing outputs silently
+        if (configDirty || !document.getElementById('configOutput').value.trim()) generateConfig(true);
+        if (!document.getElementById('csvOutput').value.trim()) generateCSV();
+        if (!document.getElementById('cmdOutput').value.trim()) generateCommand();
+
+        const files = [
+            { name: 'nextflow.config', content: document.getElementById('configOutput').value, type: 'text/plain' },
+            { name: 'samplesheet.csv', content: document.getElementById('csvOutput').value, type: 'text/csv' },
+            { name: 'command.txt', content: document.getElementById('cmdOutput').value, type: 'text/plain' }
+        ];
+
+        // Sequential downloads to avoid browser popup blockers
+        files.forEach((file, index) => {
+            setTimeout(() => {
+                const blob = new Blob([file.content], { type: file.type });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            }, index * 400);
+        });
+    }
+
+    // ===== NAVIGATION =====
+    function switchTab(n) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`tab${n}`).classList.add('active');
+        document.querySelector(`.tab-btn[data-tab="${n}"]`).classList.add('active');
+        currentTab = n;
+        document.getElementById('btnBack').disabled = (n === 1);
+        document.getElementById('btnNext').textContent = (n === 3) ? 'Finish' : 'Next →';
+    }
+
+    function goNext() {
+        if (currentTab === 1 && !checkUnsaved()) return;
+        if (currentTab === 2 && samplesheetRows.length === 0) {
+            alert("Warning: You must add at least one sample row before proceeding.");
+            return;
+        }
+        if (currentTab < 3) switchTab(currentTab + 1);
+        else alert("Wizard complete! Download your files and run the command.");
+    }
+
+    function goBack() {
+        if (currentTab > 1) {
+            clearTabData(currentTab);
+            switchTab(currentTab - 1);
+        }
+    }
+
+    function clearTabData(tab) {
+        if (tab === 2) clearSamplesheet();
+        if (tab === 3) {
+            ['launch_pipeline','launch_config','launch_input','cmdOutput'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('launch_work').value = 'work';
+            document.getElementById('launch_outdir').value = 'results';
+            document.getElementById('launch_exp_type').value = '';
+        }
+    }
+
+    function resetForm() {
+        if(!confirm("Reset entire wizard? All entered data will be lost.")) return;
+        document.querySelectorAll('input:not([disabled]), textarea').forEach(el => el.value = '');
+        document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+        document.getElementById('maxMem').value = '128.GB';
+        document.getElementById('maxCpus').value = '16';
+        document.getElementById('launch_work').value = 'work';
+        document.getElementById('launch_outdir').value = 'results';
+        samplesheetRows = []; renderSamplesheet(); updateExpNameLock();
+        configDirty = false;
+        lockedExpName = '';
+        updateIndexFields();
+        updateSampleTypeOptions();
+        applyPresets();
+        switchTab(1);
+    }
+</script>
+</body>
+</html>
