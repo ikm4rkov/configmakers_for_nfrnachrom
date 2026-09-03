@@ -250,8 +250,8 @@ HFFc6_imargi_1,/data/fastq/SRR8206680_1.fastq.gz,/data/fastq/SRR8206680_2.fastq.
             <p style="margin:0 0 5px;">For ATA experiments with matching RNA-seq data, use the following format:</p>
             <p style="margin:0 0 5px;"><strong>All FASTQ entries must be absolute full paths.</strong> Example:</p>
             <pre>sample,rna,dna,description
-HFFc6_imargi_1,/data/fastq/SRR8206679_1.fastq.gz,/data/fastq/SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:rnaseq_HFFc6
-HFFc6_imargi_1,/data/fastq/SRR8206680_1.fastq.gz,/data/fastq/SRR8206680_2.fastq.gz,tissue:"HFFc6";rnaseq:rnaseq_HFFc6
+HFFc6_imargi_1,/data/fastq/SRR8206679_1.fastq.gz,/data/fastq/SRR8206679_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"
+HFFc6_imargi_1,/data/fastq/SRR8206680_1.fastq.gz,/data/fastq/SRR8206680_2.fastq.gz,tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"
 rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_2.fastq.gz,tissue:"HFFc6"</pre>
         </div>
 
@@ -295,10 +295,8 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
                 <div class="form-group">
                     <label class="req">Container profile</label>
                     <select id="launch_profile">
-                        <option value="singularity">singularity (recommended)</option>
+                        <option value="singularity">singularity</option>
                         <option value="docker">docker</option>
-                        <option value="conda">conda</option>
-                        <option value="local">local (no container)</option>
                     </select>
                 </div>
                 <div class="form-group"><label class="req">Config file path</label><input type="text" id="launch_config" placeholder="/path/to/your_config.groovy"></div>
@@ -336,14 +334,15 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
     const bridgePresets = {
       grid: {
         unsplit: { dna_part: '*s[AG|AGCT]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'GTTCGGTGTGTG', rev: 'CACACACCGAAC', max_mm: 1, min_len: 14 },
-        split: { dna_part: '*', rna_part: '.', bridge_proc: false }
+        split: { dna_part: '*', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: '', rev: '', max_mm: 1, min_len: 14 }
       },
-      imargi: { dna_part: '*', rna_part: '-[2].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
+      imargi: { dna_part: '*', rna_part: 's[CT|CT].', bridge_proc: false, debridge: 'chartools', fwd: 'GTTGGAGTTCGGTGTGTGGGAGTGAGCTGTGTC', rev: 'GACACAGCTCACTCCCACACACCGAACTCCAAC', max_mm: 1, min_len: 14 },
       char: {
         unsplit: { dna_part: '*s[GATC|GATC]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'CTTGGACGCCGGTTTTTTT', rev: 'AAAAAAACCGGCGTCCAAG', max_mm: 1, min_len: 14 },
-        split: { dna_part: '*', rna_part: '.', bridge_proc: false }
+        split: { dna_part: '*', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: '', rev: '', max_mm: 1, min_len: 14 }
       },
-      redc: { bridge_proc: false, fwd: '', rev: '', debridge: 'bitap' }
+      redc: { dna_part: '*+(CATG)', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', rev: '', max_mm: 1, min_len: 14 },
+      ota: { bridge_proc: false }
     };
 
     const mapperDefaults = {
@@ -428,12 +427,13 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
         const rna = document.getElementById('rnaAlignTool').value;
         const dna = document.getElementById('dnaAlignTool').value;
         const box = document.getElementById('indexPaths');
+
         if (rna && dna && rna === dna) {
-            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label>Genome index Path (calculates from genome FASTA if empty)</label><input type="text" id="sharedIdx" placeholder=""></div>`;
+            box.innerHTML = `<div class="form-group" style="grid-column: span 2;"><label>Genome index Path (calculates from genome FASTA if empty)</label><input type="text" id="sharedIdx" placeholder="/path/to/genome/index"></div>`;
         } else {
             box.innerHTML = `
-                <div class="form-group"><label">RNA genome Index Path</label><input type="text" id="rnaIdx" placeholder="/path/to/rna/index"></div>
-                <div class="form-group"><label">DNA genome Index Path</label><input type="text" id="dnaIdx" placeholder="/path/to/dna/index"></div>`;
+                <div class="form-group"><label>RNA genome Index Path</label><input type="text" id="rnaIdx" placeholder="/path/to/rna/index"></div>
+                <div class="form-group"><label>DNA genome Index Path</label><input type="text" id="dnaIdx" placeholder="/path/to/dna/index"></div>`;
         }
         box.querySelectorAll('input').forEach(i => i.addEventListener('input', markDirty));
         markDirty();
@@ -448,6 +448,10 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
         const cfg = (preset.unsplit && !split) ? preset.unsplit : (preset.split || preset);
         document.getElementById('fwdBridge').value = cfg.fwd || '';
         document.getElementById('revBridge').value = cfg.rev || '';
+        document.getElementById('DnaEnds').value = cfg.dna_part ?? '*';
+        document.getElementById('RnaEnds').value = cfg.rna_part ?? '.';
+        document.getElementById('maxmm').value = cfg.max_mm ?? 1;
+        document.getElementById('minlen').value = cfg.min_len ?? 14;
         document.getElementById('bridgeProc').value = (method === 'imargi') ? 'false' : String(cfg.bridge_proc ?? false);
         document.getElementById('bridgeProc').disabled = (method === 'imargi');
         document.getElementById('debridgeTool').value = cfg.debridge || 'bitap';
@@ -485,7 +489,7 @@ function generateConfig(silent = false) {
         return; // Stop execution early if validation fails
     }
 
-    // 3. Extract OPTIONAL index fields (THESE WERE MISSING IN YOUR SNIPPET, CAUSING THE CRASH)
+    // 3. Extract only the genome-index field(s) currently displayed.
     const shared = document.getElementById('sharedIdx')?.value.trim() || '';
     const rnaI = document.getElementById('rnaIdx')?.value.trim() || '';
     const dnaI = document.getElementById('dnaIdx')?.value.trim() || '';
@@ -503,6 +507,10 @@ function generateConfig(silent = false) {
     const debridgeTool = document.getElementById('debridgeTool').value;
     const fwdBridge = document.getElementById('fwdBridge').value;
     const revBridge = document.getElementById('revBridge').value;
+    const maxmm = document.getElementById('maxmm').value;
+    const minlen = document.getElementById('minlen').value;
+    const dnaEnds = document.getElementById('DnaEnds').value;
+    const rnaEnds = document.getElementById('RnaEnds').value;
     const maxMem = document.getElementById('maxMem').value;
     const maxCpus = document.getElementById('maxCpus').value;
     const blacklist = document.getElementById('blacklist').value;
@@ -510,10 +518,10 @@ function generateConfig(silent = false) {
     const peakcall = document.getElementById('peakcall').value;
     const adapterfile = document.getElementById('adapterfile').value;
 
-    // 5. Handle mapper index logic
-    let idxLine = (rnaT === dnaT) 
-        ? `    ${rnaT}_index = '${shared || ''}'`
-        : `    ${rnaT}_index = '${rnaI || ''}'\n    ${dnaT}_index = '${dnaI || ''}'`;
+    // 5. Same mapper => one shared index; different mappers => separate indexes.
+    let idxLine = (rnaT === dnaT)
+        ? `    ${rnaT}_index = '${shared}'`
+        : `    ${rnaT}_index = '${rnaI}'\n    ${dnaT}_index = '${dnaI}'`;
 
     // 6. Build the configuration string using the extracted variables
     const cfg = `includeConfig "\${projectDir}/conf/base.config"
@@ -525,9 +533,7 @@ params {
     split_by_chromosomes = false
     dedup_tool = "${dedupTool}"
     trim_tool = "${trimTool}"
-    ${rnaT === dnaT ? `align_tool = '${rnaT}'\n` : ''}    merge_pairedend_tool = '${mergeTool}'
-    rna_align_tool = '${rnaT}'
-    dna_align_tool = '${dnaT}'
+    ${rnaT === dnaT ? `align_tool = '${rnaT}'\n    ` : `rna_align_tool = '${rnaT}'\n    dna_align_tool = '${dnaT}'\n    `}merge_pairedend_tool = '${mergeTool}'
 ${idxLine}
     stages = 'annotation, splicing, normalize, peak_calling'
     genome_fasta = '${genome_fasta}'
@@ -539,10 +545,10 @@ ${idxLine}
     debridge_tool = "${debridgeTool}"
     forward_bridge_seq = "${fwdBridge}"
     reverse_bridge_seq = "${revBridge}"
-    dna_part_processing = "*"
-    rna_part_processing = "."
-    max_mismatches = 1
-    min_rna_dna_parts_length = 14
+    dna_part_processing = "${dnaEnds}"
+    rna_part_processing = "${rnaEnds}"
+    max_mismatches = ${maxmm}
+    min_rna_dna_parts_length = ${minlen}
     description_sequence = params.bridge_processing ? "\${dna_part_processing}b\${forward_bridge_seq}(\${max_mismatches})\${rna_part_processing}" : ""
     max_memory = '${maxMem}'
     max_cpus = ${maxCpus}
@@ -619,7 +625,7 @@ flags = [
         label.classList.toggle('req', required);
         label.textContent = required ? 'Description' : 'Description';
         input.placeholder = required
-            ? 'e.g., tissue:"HFFc6";rnaseq:rnaseq_HFFc6'
+            ? 'e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'
             : 'Optional; if provided, it will be normalized when Chromatin Potential is enabled';
     }
 
@@ -629,9 +635,9 @@ flags = [
         let value = desc.trim();
 
         if (chromPot && globalName) {
-            const suffix = `;rnaseq:rnaseq_${globalName}`;
+            const suffix = `;rnaseq:"rnaseq_${globalName}"`;
             // Remove any previous generated suffix, then append exactly one current suffix.
-            value = value.replace(/;rnaseq:rnaseq_[A-Za-z0-9_]+$/i, '');
+            value = value.replace(/;rnaseq:\"?rnaseq_[A-Za-z0-9_]+\"?$/i, '');
             value = value ? `${value}${suffix}` : suffix.slice(1);
         }
         return value;
@@ -646,7 +652,7 @@ flags = [
             if (chromPot) {
                 r.desc = normalizeDescription(r.desc || '');
             } else {
-                r.desc = (r.desc || '').replace(/;rnaseq:rnaseq_[A-Za-z0-9_]+$/i, '');
+                r.desc = (r.desc || '').replace(/;rnaseq:\"?rnaseq_[A-Za-z0-9_]+\"?$/i, '');
             }
         });
         renderSamplesheet();
@@ -715,7 +721,7 @@ flags = [
         samplesheetRows.forEach((r, i) => {
             tbody.innerHTML += `<tr>
                 <td>${r.type === 'exp' ? 'Experimental' : 'RNA-seq'}</td>
-                <td>${r.type === 'rnaseq' ? `rnaseq_${r.sample}` : r.sample}</td>
+                <td>${r.sample}</td>
                 <td>${r.rna || '-'}</td><td>${r.dna || '-'}</td><td>${r.desc || '-'}</td>
                 <td class="row-actions"><button class="btn btn-danger" onclick="removeRow(${i})">Remove</button></td>
             </tr>`;
@@ -740,8 +746,9 @@ flags = [
         if (samplesheetRows.length === 0) { alert("No samples added."); return; }
         let csv = 'sample,rna,dna,description\n';
         samplesheetRows.forEach(r => {
-            const name = r.type === 'rnaseq' ? `rnaseq_${r.sample}` : r.sample;
-            csv += `${name},${r.rna},${r.dna},${r.desc}\n`;
+            const name = r.sample;
+            const desc = normalizeDescription(r.desc || '');
+            csv += `${name},${r.rna},${r.dna},${desc}\n`;
         });
         document.getElementById('csvOutput').value = csv;
     }
