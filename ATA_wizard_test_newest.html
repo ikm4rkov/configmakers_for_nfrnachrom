@@ -307,8 +307,8 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
                     <label>Experiment Type (auto-filled)</label>
                     <input type="text" id="launch_exp_type" readonly placeholder="Syncs from Config tab">
                 </div>
-                <div class="form-group"><label class="req">Work directory</label><input type="text" id="launch_work" value="work"></div>
-                <div class="form-group"><label class="req">Output directory</label><input type="text" id="launch_outdir" value="results"></div>
+                <div class="form-group"><label class="req">Work directory</label><input type="text" id="launch_work" placeholder="work"></div>
+                <div class="form-group"><label class="req">Output directory</label><input type="text" id="launch_outdir" placeholder="results"></div>
             </div>
         </div>
 
@@ -557,6 +557,43 @@ ${idxLine}
     peak_calling = '${peakcall}'
     adapters_file = '${adapterfile}'
     publish_dir_mode = 'copy'
+
+    // TRIMMING ROBUSTNESS     --------------------------------------------------------------------------------
+    trim_fail_on_loss           = true
+    trim_min_keep_fraction      = 0.5
+
+    // RNA-SEQ                 --------------------------------------------------------------------------------
+    rnaseq_dedup                = false
+
+    // CHROMATIN POTENTIAL     --------------------------------------------------------------------------------
+    chp_distance                = 500000
+    chp_n_contacts_min          = 100
+    chp_fdr_threshold           = 0.05
+    chp_gene_len_min            = 100
+
+    // EDITDISTANCE / CIGAR FILTER --------------------------------------------------------------------------
+    filter_edit_dist_type       = "NM + N_softClipp_bp"
+    filter_r1_edit_dist_max     = 2
+    filter_r2_edit_dist_max     = 2
+    filter_r1_mapq_min           = 0
+    filter_r2_mapq_min           = 0
+    filter_ota_pe_distance_max   = 300
+
+    // BARDIC OPTIONS          --------------------------------------------------------------------------------
+    bardic_min_contacts          = 1000
+    bardic_trans_min             = 10000
+    bardic_trans_max             = 1000000
+    bardic_trans_step            = 1000
+    bardic_cis_min               = 1.1
+    bardic_cis_max               = 2
+    bardic_cis_start             = 5000
+    bardic_tolerance             = 0.01
+    bardic_window                = 1
+    bardic_ifactor               = 0.01
+    bardic_degree                = 3
+    bardic_max_threshold         = 0.05
+    bardic_fill_value            = 1
+    bardic_qval_threshold        = 1
 }
 
 process {
@@ -649,7 +686,7 @@ flags = [
         if (!globalName) return;
 
         samplesheetRows.forEach(r => {
-            if (chromPot) {
+            if (chromPot && r.type === 'exp') {
                 r.desc = normalizeDescription(r.desc || '');
             } else {
                 r.desc = (r.desc || '').replace(/;rnaseq:\"?rnaseq_[A-Za-z0-9_]+\"?$/i, '');
@@ -681,7 +718,8 @@ flags = [
         const type = document.getElementById('ss_type').value;
         const rna = document.getElementById('ss_rna').value.trim();
         const dna = document.getElementById('ss_dna').value.trim();
-        const desc = normalizeDescription(document.getElementById('ss_desc').value);
+        const descInput = document.getElementById('ss_desc').value.trim();
+        const desc = type === 'rnaseq' ? descInput : normalizeDescription(descInput);
 
         if (!globalName) {
             alert("Please enter a Global Experiment Name before adding samples.");
@@ -691,7 +729,7 @@ flags = [
             alert("Global Experiment Name may contain only Latin letters, digits and underscore (_).");
             return;
         }
-        if (!rna || !dna || (document.getElementById('chromPot').value === 'true' && !desc)) {
+        if (!rna || !dna || (document.getElementById('chromPot').value === 'true' && type === 'exp' && !desc)) {
             alert("Warning: RNA and DNA FASTQ fields are required; Description is also required when Chromatin Potential Analysis is enabled.");
             return;
         }
@@ -744,29 +782,58 @@ flags = [
 
     function generateCSV() {
         if (samplesheetRows.length === 0) { alert("No samples added."); return; }
+
+        const chromPot = document.getElementById('chromPot').value === 'true';
+        if (chromPot) {
+            const experimentalCount = samplesheetRows.filter(r => r.type === 'exp').length;
+            const rnaseqCount = samplesheetRows.filter(r => r.type === 'rnaseq').length;
+            if (experimentalCount === 0 || rnaseqCount === 0) {
+                alert("Warning: Chromatin Potential Analysis requires at least one Experimental row and at least one RNA-seq row before the samplesheet can be generated.");
+                return;
+            }
+        }
+
         let csv = 'sample,rna,dna,description\n';
         samplesheetRows.forEach(r => {
             const name = r.sample;
-            const desc = normalizeDescription(r.desc || '');
+            const desc = r.type === 'exp' ? normalizeDescription(r.desc || '') : (r.desc || '');
             csv += `${name},${r.rna},${r.dna},${desc}\n`;
         });
         document.getElementById('csvOutput').value = csv;
     }
 
     // ===== LAUNCH COMMAND =====
+    function validateLaunchFields() {
+        const required = [
+            ['launch_pipeline', 'Pipeline path'],
+            ['launch_config', 'Config file path'],
+            ['launch_input', 'Samplesheet path (--input)'],
+            ['launch_work', 'Work directory'],
+            ['launch_outdir', 'Output directory']
+        ];
+        const missing = required.filter(([id]) => !document.getElementById(id).value.trim()).map(([, label]) => label);
+        if (missing.length) {
+            alert(`Warning: Please fill in all required fields in the Command Building tab before continuing. Missing: ${missing.join(', ')}.`);
+            return false;
+        }
+        return true;
+    }
+
     function generateCommand() {
-        const p = document.getElementById('launch_pipeline').value || '.';
+        if (!validateLaunchFields()) return;
+
+        const p = document.getElementById('launch_pipeline').value.trim();
         const prof = document.getElementById('launch_profile').value;
-        const cfg = document.getElementById('launch_config').value || 'nextflow.config';
-        const inp = document.getElementById('launch_input').value || 'samplesheet.csv';
+        const cfg = document.getElementById('launch_config').value.trim();
+        const inp = document.getElementById('launch_input').value.trim();
         const exp = document.getElementById('expMethod').value || 'ata';
-        const work = document.getElementById('launch_work').value || 'work';
-        const out = document.getElementById('launch_outdir').value || 'results';
+        const work = document.getElementById('launch_work').value.trim();
+        const out = document.getElementById('launch_outdir').value.trim();
 
         document.getElementById('launch_exp_type').value = `--exp_type ${exp}`;
 
         let args = [`nextflow run ${p}/main.nf`];
-        if (prof !== 'local') args.push(`-profile ${prof}`);
+        args.push(`-profile ${prof}`);
         args.push(`-c ${cfg}`);
         args.push(`--input ${inp}`);
         args.push(`--exp_type ${exp}`);
@@ -777,6 +844,7 @@ flags = [
     }
 
     function downloadCommand() {
+        if (!validateLaunchFields()) return;
         const cmd = document.getElementById('cmdOutput').value;
         if(!cmd) { alert("Generate command first."); return; }
         const blob = new Blob([cmd], {type: 'text/plain'});
@@ -784,15 +852,36 @@ flags = [
     }
 
     function downloadAllFiles() {
+        if (!validateLaunchFields()) return;
+
         if (samplesheetRows.length === 0) {
             alert("Warning: Cannot download all files. Please add at least one sample row in the Samplesheet tab.");
             return;
         }
-        
-        // Generate missing outputs silently
-        if (configDirty || !document.getElementById('configOutput').value.trim()) generateConfig(true);
-        if (!document.getElementById('csvOutput').value.trim()) generateCSV();
+
+        const chromPot = document.getElementById('chromPot').value === 'true';
+        if (chromPot) {
+            const experimentalCount = samplesheetRows.filter(r => r.type === 'exp').length;
+            const rnaseqCount = samplesheetRows.filter(r => r.type === 'rnaseq').length;
+            if (experimentalCount === 0 || rnaseqCount === 0) {
+                alert("Warning: Cannot download all files. Chromatin Potential Analysis requires at least one Experimental row and at least one RNA-seq row.");
+                return;
+            }
+        }
+
+        // Validate the Config tab before generating its file.
+        const configBefore = document.getElementById('configOutput').value.trim();
+        if (configDirty || !configBefore) {
+            generateConfig(true);
+            if (!document.getElementById('configOutput').value.trim()) return;
+        }
+
+        if (!document.getElementById('csvOutput').value.trim()) {
+            generateCSV();
+            if (!document.getElementById('csvOutput').value.trim()) return;
+        }
         if (!document.getElementById('cmdOutput').value.trim()) generateCommand();
+        if (!document.getElementById('cmdOutput').value.trim()) return;
 
         const files = [
             { name: 'nextflow.config', content: document.getElementById('configOutput').value, type: 'text/plain' },
@@ -847,8 +936,8 @@ flags = [
         if (tab === 2) clearSamplesheet();
         if (tab === 3) {
             ['launch_pipeline','launch_config','launch_input','cmdOutput'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('launch_work').value = 'work';
-            document.getElementById('launch_outdir').value = 'results';
+            document.getElementById('launch_work').value = '';
+            document.getElementById('launch_outdir').value = '';
             document.getElementById('launch_exp_type').value = '';
         }
     }
@@ -859,8 +948,8 @@ flags = [
         document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
         document.getElementById('maxMem').value = '128.GB';
         document.getElementById('maxCpus').value = '16';
-        document.getElementById('launch_work').value = 'work';
-        document.getElementById('launch_outdir').value = 'results';
+        document.getElementById('launch_work').value = '';
+        document.getElementById('launch_outdir').value = '';
         samplesheetRows = []; renderSamplesheet(); updateExpNameLock();
         configDirty = false;
         lockedExpName = '';
