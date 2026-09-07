@@ -72,6 +72,8 @@
             background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #e9ecef;
         }
         .tool-param-row label { font-size: 0.82rem; margin-bottom: 3px; }
+        .debridge-box { margin: 14px 0; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fa; }
+        .debridge-box .debridge-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 
         /* Buttons */
         .btn {
@@ -183,19 +185,20 @@
                 </div>
             </div>
             <div id="indexPaths" class="grid-2" style="margin-top: 5px;"></div>
-            <p class="hint">Note: Bridge sequence determined as: <code>5'-DNA part - forward bridge - RNA part-3'</code></p>
-            <div class="grid-2" style="margin-bottom: 12px;">
-                <div class="form-group"><label>Forward bridge sequence</label><input type="text" id="fwdBridge"></div>
-                <div class="form-group"><label>Reverse bridge sequence</label><input type="text" id="revBridge"></div>
-                <div class="form-group"><label>Max mismatch number</label><input type="text" id="maxmm"></div>
-                <div class="form-group"><label>Min part length (both RNA- and DNA-)</label><input type="text" id="minlen"></div>
-                <div class="form-group"><label>DNA- part processing</label><input type="text" id="DnaEnds"></div>
-                <div class="form-group"><label>RNA- part processing</label><input type="text" id="RnaEnds"></div>
-            </div>
-            
-            <div class="tool-param-row">
-                <div><label>De-bridge Tool</label><select id="debridgeTool"><option value="bitap">bitap (default)</option><option value="chartools">chartools</option></select></div>
-                <div><label>Bridge Processing</label><select id="bridgeProc"><option value="true">true</option><option value="false">false</option></select></div>
+            <div class="debridge-box">
+                <div class="debridge-top">
+                    <div><label>De-bridge Tool</label><select id="debridgeTool"><option value="bitap">bitap (default)</option><option value="chartools">chartools</option></select></div>
+                    <div><label>Bridge Processing</label><select id="bridgeProc"><option value="true">true</option><option value="false">false</option></select></div>
+                </div>
+                <p class="hint">Note: Bridge sequence determined as: <code>5'-DNA part - forward bridge - RNA part-3'</code></p>
+                <div class="grid-2">
+                    <div class="form-group"><label>Forward bridge sequence</label><input type="text" id="fwdBridge"></div>
+                    <div class="form-group"><label>Reverse bridge sequence</label><input type="text" id="revBridge"></div>
+                    <div class="form-group"><label>Max mismatch number</label><input type="text" id="maxmm"></div>
+                    <div class="form-group"><label>Min part length (both RNA- and DNA-)</label><input type="text" id="minlen"></div>
+                    <div class="form-group"><label>DNA- part processing</label><input type="text" id="DnaEnds"></div>
+                    <div class="form-group"><label>RNA- part processing</label><input type="text" id="RnaEnds"></div>
+                </div>
             </div>
             <div class="tool-param-row">
                 <div><label>Deduplication Tool</label><select id="dedupTool" onchange="applyToolDefaults('dedup')"><option value="fastq-dupaway">fastq-dupaway</option><option value="fastuniq">fastuniq</option></select></div>
@@ -263,7 +266,13 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
 
         <div class="grid-2" style="background:#f8f9fa; padding:12px; border-radius:6px; margin-bottom:12px;">
             <div class="form-group"><label>Sample ID (auto-filled)</label><input type="text" id="ss_sample" readonly></div>
-            <div class="form-group"><label>Row Type</label><select id="ss_type"><option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option></select></div>
+            <div class="form-group"><label>Row Type</label><select id="ss_type" onchange="updateRnaSeqTypeUI()"><option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option></select></div>
+            <div class="form-group" id="ssRnaSeqTypeBox" style="display:none;">
+                <label>RNA-seq data type</label>
+                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; margin-top:8px;">
+                    <input type="checkbox" id="ssRnaSeqSE" onchange="updateRnaSeqTypeUI()" style="width:auto;"> Single-end (SE)
+                </label>
+            </div>
             <div class="form-group"><label class="req">Forward (Paired-end data)/ RNA (no bridge split data) FASTQ</label><input type="text" id="ss_rna" placeholder="/absolute/path/to/sample_R1.fastq.gz"><div class="hint">Absolute full path required, e.g. /data/fastq/sample_R1.fastq.gz</div></div>
             <div class="form-group"><label class="req">Reverse complement (Paired-end data)/ DNA (no bridge split data) FASTQ</label><input type="text" id="ss_dna" placeholder="/absolute/path/to/sample_R2.fastq.gz"><div class="hint">Absolute full path required, e.g. /data/fastq/sample_R2.fastq.gz</div></div>
             <div class="form-group" style="grid-column: span 2;"><label id="ssDescLabel">Description</label><input type="text" id="ss_desc" placeholder='e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'></div>
@@ -403,6 +412,7 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
             updateDescriptionRequirement();
         });
         document.getElementById('ss_type').addEventListener('change', updateDescriptionRequirement);
+        updateRnaSeqTypeUI();
         document.getElementById('ss_desc').addEventListener('input', updateDescriptionRequirement);
     });
 
@@ -646,6 +656,7 @@ flags = [
             type.innerHTML = '<option value="exp">Experimental</option>';
             type.value = 'exp';
             type.disabled = true;
+            document.getElementById('ssRnaSeqSE').checked = false;
         } else {
             type.innerHTML = '<option value="exp">Experimental</option><option value="rnaseq">RNA-seq / Control</option>';
             type.disabled = false;
@@ -658,12 +669,31 @@ flags = [
         const chromPot = document.getElementById('chromPot').value === 'true';
         const label = document.getElementById('ssDescLabel');
         const input = document.getElementById('ss_desc');
-        const required = chromPot;
-        label.classList.toggle('req', required);
-        label.textContent = required ? 'Description' : 'Description';
+        label.classList.remove('req');
+        label.textContent = 'Description';
         input.placeholder = required
             ? 'e.g., tissue:"HFFc6";rnaseq:"rnaseq_HFFc6"'
             : 'Optional; if provided, it will be normalized when Chromatin Potential is enabled';
+    }
+
+    function updateRnaSeqTypeUI() {
+        const type = document.getElementById('ss_type').value;
+        const isRnaseq = type === 'rnaseq';
+        const box = document.getElementById('ssRnaSeqTypeBox');
+        const dna = document.getElementById('ss_dna');
+        const dnaLabel = dna.parentElement.querySelector('label');
+        box.style.display = isRnaseq ? 'block' : 'none';
+        if (isRnaseq && document.getElementById('ssRnaSeqSE').checked) {
+            dna.value = '';
+            dna.disabled = true;
+            dna.placeholder = 'Not used for SE RNA-seq';
+            if (dnaLabel) dnaLabel.classList.remove('req');
+        } else {
+            dna.disabled = false;
+            dna.placeholder = '/absolute/path/to/sample_R2.fastq.gz';
+            if (dnaLabel) dnaLabel.classList.add('req');
+        }
+        updateDescriptionRequirement();
     }
 
     function normalizeDescription(desc) {
@@ -729,11 +759,12 @@ flags = [
             alert("Global Experiment Name may contain only Latin letters, digits and underscore (_).");
             return;
         }
-        if (!rna || !dna || (document.getElementById('chromPot').value === 'true' && type === 'exp' && !desc)) {
-            alert("Warning: RNA and DNA FASTQ fields are required; Description is also required when Chromatin Potential Analysis is enabled.");
+        const rnaseqSE = type === 'rnaseq' && document.getElementById('ssRnaSeqSE').checked;
+        if (!rna || (!dna && !rnaseqSE) || (document.getElementById('chromPot').value === 'true' && type === 'exp' && !desc)) {
+            alert("Warning: RNA FASTQ is required; DNA FASTQ is also required for paired-end data. Description is required only for Experimental rows when Chromatin Potential Analysis is enabled.");
             return;
         }
-        if (!isAbsolutePath(rna) || !isAbsolutePath(dna)) {
+        if (!isAbsolutePath(rna) || (dna && !isAbsolutePath(dna))) {
             alert("FASTQ paths must be absolute full paths, e.g. /data/fastq/sample_R1.fastq.gz.");
             return;
         }
@@ -745,6 +776,8 @@ flags = [
         renderSamplesheet();
         updateExpNameLock();
         ['ss_rna','ss_dna','ss_desc'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('ssRnaSeqSE').checked = false;
+        updateRnaSeqTypeUI();
         syncSampleIdField();
     }
 
