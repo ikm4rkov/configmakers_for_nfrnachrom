@@ -487,14 +487,14 @@ function generateConfig(silent = false) {
     const exp = document.getElementById('expMethod').value.trim();
     const rnaT = document.getElementById('rnaAlignTool').value.trim();
     const dnaT = document.getElementById('dnaAlignTool').value.trim();
+    const config_profile_name = document.getElementById('species').value.trim();
     const genome_fasta = document.getElementById('genomeFasta').value.trim();
     const detect_strand_genes_list = document.getElementById('lineageGenes').value.trim();
     const annot_BED = document.getElementById('annotBed').value.trim();
     const annot_GTF = document.getElementById('annotGtf').value.trim();
-    const organism_name = document.getElementById('species').value.trim();
 
     // 2. Validate that all required fields are filled
-    if (!exp || !rnaT || !dnaT || !genome_fasta || !detect_strand_genes_list || !annot_BED || !annot_GTF || !organism_name) {
+    if (!exp || !rnaT || !dnaT || !genome_fasta || !detect_strand_genes_list || !annot_BED || !annot_GTF || !config_profile_name) {
         alert("Warning: All required fields must be filled out.");
         return; // Stop execution early if validation fails
     }
@@ -539,8 +539,7 @@ includeConfig "\${projectDir}/conf/modules.config"
 
 params {
     exp_type = '${exp}'
-    procedure = 'old'
-    split_by_chromosomes = false
+    config_profile_name = '${config_profile_name}'
     dedup_tool = "${dedupTool}"
     trim_tool = "${trimTool}"
     ${rnaT === dnaT ? `align_tool = '${rnaT}'\n    ` : `rna_align_tool = '${rnaT}'\n    dna_align_tool = '${dnaT}'\n    `}merge_pairedend_tool = '${mergeTool}'
