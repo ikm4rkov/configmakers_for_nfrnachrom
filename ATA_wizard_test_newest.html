@@ -63,6 +63,80 @@
         input:disabled, select:disabled { background: #e9ecef; cursor: not-allowed; opacity: 0.8; }
         textarea { font-family: 'Courier New', monospace; min-height: 260px; background: #f8f9fa; resize: vertical; }
         .hint { color: var(--hint); font-size: 0.82rem; margin-top: 3px; }
+
+        /* Click-to-open field help */
+        .label-with-help {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 5px;
+        }
+        .label-with-help > label {
+            display: inline;
+            margin-bottom: 0;
+        }
+        .help-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .help-btn {
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            border: 1px solid var(--primary);
+            border-radius: 50%;
+            background: #fff;
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 16px;
+            text-align: center;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+        .help-btn:hover,
+        .help-btn:focus {
+            background: var(--primary);
+            color: #fff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.15);
+        }
+        .help-popover {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: min(420px, 75vw);
+            padding: 12px 14px;
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.16);
+            font-size: 0.82rem;
+            font-weight: 400;
+            line-height: 1.5;
+            z-index: 1000;
+        }
+        .help-popover::before {
+            content: '';
+            position: absolute;
+            top: -7px;
+            left: 5px;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-left: 1px solid var(--border);
+            border-top: 1px solid var(--border);
+            transform: rotate(45deg);
+        }
+        .help-popover.show {
+            display: block;
+        }
+        .help-popover a {
+            color: var(--primary);
+        }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
 
@@ -138,6 +212,7 @@
                     <option value="imargi">MARGI / iMARGI</option>
                     <option value="char">ChAR-seq</option>
                     <option value="redc">Red-C / RedChIP</option>
+                    <option value="radicl">RADICL-seq</option>
                 </select>
             </div>
             <div class="form-group">
@@ -159,8 +234,32 @@
         <h2 style="font-size:1.3rem; margin-top: 20px;">Pipeline Configuration</h2>
         <div class="grid-2">
             <div class="form-group"><label class="req">Genome FASTA Path</label><input type="text" id="genomeFasta" placeholder="/path/to/genome.fa"></div>
-            <div class="form-group"><label class="req">Ribosomal protein genes list</label><input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab"></div>
-            <div class="form-group"><label class="req">Gene annotation BEDRC file</label><input type="text" id="annotBed" placeholder="/path/to/genes.bedrc"></div>
+            <div class="form-group">
+                <div class="label-with-help">
+                    <label class="req">Ribosomal protein genes list</label>
+                    <span class="help-wrap">
+                        <button type="button" class="help-btn" aria-label="Help for Ribosomal protein genes list" aria-expanded="false" onclick="toggleHelp(this)">?</button>
+                        <span class="help-popover" role="tooltip">
+                            A column of genes that encode ribosomal proteins separated by line breaks. The ribosomal protein genes are highly conservative and by comparing reads and voting for correct or reverse complement strand one can decide whether it is native strand for experiment or RC.
+                        </span>
+                    </span>
+                </div>
+                <input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab">
+            </div>
+            <div class="form-group">
+                <div class="label-with-help">
+                    <label class="req">Gene annotation BEDRC file</label>
+                    <span class="help-wrap">
+                        <button type="button" class="help-btn" aria-label="Help for Gene annotation BEDRC file" aria-expanded="false" onclick="toggleHelp(this)">?</button>
+                        <span class="help-popover" role="tooltip">
+                            An expanded BED format is used here with 7 required columns. An example for it can be found
+                            <a href="#" target="_blank" rel="noopener noreferrer" onclick="event.preventDefault();">here</a>.
+                            Replace the link target in the HTML with the BEDRC example URL when you have it.
+                        </span>
+                    </span>
+                </div>
+                <input type="text" id="annotBed" placeholder="/path/to/genes.bedrc">
+            </div>
             <div class="form-group"><label class="req">Gene annotation GTF file</label><input type="text" id="annotGtf" placeholder="/path/to/genes.gtf"></div>
             <div class="form-group"><label class="req">Organism name</label><input type="text" id="species" placeholder=""></div>
         </div>
@@ -196,8 +295,40 @@
                     <div class="form-group"><label>Reverse bridge sequence</label><input type="text" id="revBridge"></div>
                     <div class="form-group"><label>Max mismatch number</label><input type="text" id="maxmm"></div>
                     <div class="form-group"><label>Min part length (both RNA- and DNA-)</label><input type="text" id="minlen"></div>
-                    <div class="form-group"><label>DNA- part processing</label><input type="text" id="DnaEnds"></div>
-                    <div class="form-group"><label>RNA- part processing</label><input type="text" id="RnaEnds"></div>
+                    <div class="form-group">
+                        <div class="label-with-help">
+                            <label>DNA- part processing</label>
+                            <span class="help-wrap">
+                                <button type="button" class="help-btn" aria-label="Help for DNA-part processing" aria-expanded="false" onclick="toggleHelp(this)">?</button>
+                                <span class="help-popover" role="tooltip">
+                                    A description string containing commands how to process the DNA-part of a read.
+                                    <strong>ALWAYS</strong> has to contain <code>*</code> symbol, by it the tool identifies the DNA-part.
+                                    In addition can contain two operands either before the <code>*</code> symbol what would mean that it is applied to 5'-end of the sequence or after <code>*</code> symbol what would mean that it is applied to 3'-end sequence:
+                                    <code>s[string1|string2]</code> will substitute the suffix containing string1 on an end of DNA reads sequence to string2 and drop any reads that don't have this sequence in separate file and
+                                    <code>+(string3)</code> will add string3 to an end of reads sequence.
+                                    Normal reads that match all the condition will be distributed into two files for filtered DNA- and filtered RNA-parts.
+                                </span>
+                            </span>
+                        </div>
+                        <input type="text" id="DnaEnds">
+                    </div>
+                    <div class="form-group">
+                        <div class="label-with-help">
+                            <label>RNA- part processing</label>
+                            <span class="help-wrap">
+                                <button type="button" class="help-btn" aria-label="Help for RNA-part processing" aria-expanded="false" onclick="toggleHelp(this)">?</button>
+                                <span class="help-popover" role="tooltip">
+                                    A description string containing commands how to process the RNA-part of a read.
+                                    <strong>ALWAYS</strong> has to contain <code>.</code> symbol, by it the tool identifies the RNA-part.
+                                    In addition can contain two operands either before the <code>.</code> symbol what would mean that it is applied to 5'-end of the sequence or after <code>.</code> symbol what would mean that it is applied to 3'-end sequence:
+                                    <code>s[string1|string2]</code> will substitute the suffix containing string1 on an end of RNA reads sequence to string2 and drop any reads that don't have this sequence in separate file and
+                                    <code>+(string3)</code> will add string3 to an end of reads sequence.
+                                    Normal reads that match all the condition will be distributed into two files for filtered DNA- and filtered RNA-parts.
+                                </span>
+                            </span>
+                        </div>
+                        <input type="text" id="RnaEnds">
+                    </div>
                 </div>
             </div>
             <div class="tool-param-row">
@@ -350,7 +481,8 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
         unsplit: { dna_part: '*s[GATC|GATC]', rna_part: '.', bridge_proc: true, debridge: 'bitap', fwd: 'CTTGGACGCCGGTTTTTTT', rev: 'AAAAAAACCGGCGTCCAAG', max_mm: 1, min_len: 14 },
         split: { dna_part: '*', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: '', rev: '', max_mm: 1, min_len: 14 }
       },
-      redc: { dna_part: '*+(CATG)', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', rev: '', max_mm: 1, min_len: 14 },
+      redc: { dna_part: '*+(CATG)', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: 'AGTCGGAGCGTTGCCTATCGCATTGATGGTGCTAGGA', rev: 'TCCTAGCACCATCAATGCGATAGGCAACGCTCCGACT', max_mm: 1, min_len: 14 },
+      radicl: { dna_part: '*', rna_part: '.', bridge_proc: false, debridge: 'bitap', fwd: 'CTGCTGCTCCTTCCCTTTCCCCTTTTGGTCCGACGGTCCAAGTCAGCAGT', rev: 'ACTGCTGACTTGGACCGTCGGACCAAAAGGGGAAAGGGAAGGAGCAGCAG', max_mm: 1, min_len: 14 },
       ota: { bridge_proc: false }
     };
 
@@ -417,6 +549,35 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
     });
 
     function markDirty() { configDirty = true; }
+
+    // ===== FIELD HELP POPOVERS =====
+    function toggleHelp(button) {
+        const popover = button.parentElement.querySelector('.help-popover');
+        const isOpen = popover.classList.contains('show');
+
+        document.querySelectorAll('.help-popover.show').forEach(p => p.classList.remove('show'));
+        document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+
+        if (!isOpen) {
+            popover.classList.add('show');
+            button.setAttribute('aria-expanded', 'true');
+        }
+    }
+
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.help-wrap')) {
+            document.querySelectorAll('.help-popover.show').forEach(p => p.classList.remove('show'));
+            document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        }
+    });
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            document.querySelectorAll('.help-popover.show').forEach(p => p.classList.remove('show'));
+            document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        }
+    });
+
     function checkUnsaved() {
         if (configDirty) {
             alert("Warning: You have unsaved settings in the configuration form. Please click 'Generate nextflow.config' to apply your changes before proceeding.");

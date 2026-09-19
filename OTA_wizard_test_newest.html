@@ -180,6 +180,20 @@
                     <label>DNA Alignment Options</label>
                     <input type="text" id="dnaOpts" placeholder="mapper-dependent">
                 </div>
+                <div class="form-group">
+                    <label>Peak calling</label>
+                    <select id="peakCalling" onchange="updatePeakCallingUI(); markDirty();">
+                        <option value="false">false</option>
+                        <option value="true">true</option>
+                    </select>
+                </div>
+                <div class="form-group" id="peakCallingToolGroup" style="display:none;">
+                    <label>Peak calling tool</label>
+                    <select id="peakCallingTool" onchange="markDirty();">
+                        <option value="bardic">bardic</option>
+                        <option value="macs2">macs2</option>
+                    </select>
+                </div>
             </div>
             <div id="indexPaths" class="grid-2" style="margin-top: 5px;"></div>
         </div>
@@ -326,6 +340,7 @@ SCIRT_chart_39_INPUT,SRR10044359.fastq.gz,,</pre>
     document.addEventListener('DOMContentLoaded', () => {
         updateIndexFields();
         applyMapperDefaults('rna'); applyMapperDefaults('dna');
+        updatePeakCallingUI();
         updateSampleTypeUI();
         syncSampleIdField();
         updateDescriptionRequirement();
@@ -394,6 +409,15 @@ SCIRT_chart_39_INPUT,SRR10044359.fastq.gz,,</pre>
         markDirty();
     }
 
+    function updatePeakCallingUI() {
+        const enabled = document.getElementById('peakCalling').value === 'true';
+        document.getElementById('peakCallingToolGroup').style.display = enabled ? 'block' : 'none';
+    }
+
+    function isPeakCallingEnabled() {
+        return document.getElementById('peakCalling').value === 'true';
+    }
+
     function applyToolDefaults(cat) {
         const tool = document.getElementById(cat + 'Tool').value;
         document.getElementById(cat + 'Flags').value = toolOptionDefaults[cat]?.[tool] || '';
@@ -429,7 +453,8 @@ function generateConfig(silent = false) {
     const maxCpus = '16';
     const blacklist = '';
     const denovo = 'true';
-    const peakcall = 'true';
+    const peakcall = document.getElementById('peakCalling').value;
+    const peakcallTool = document.getElementById('peakCallingTool').value;
     const adapterfile = '';
 
     const idxLine = (rnaT === dnaT)
@@ -445,7 +470,7 @@ params {
     dedup_tool = "${dedupTool}"
     trim_tool = "${trimTool}"
     ${rnaT === dnaT ? `align_tool = '${rnaT}'\n    ` : `rna_align_tool = '${rnaT}'\n    dna_align_tool = '${dnaT}'\n    `}${idxLine}
-    stages = 'annotation, splicing, normalize, peak_calling'
+    stages = '${peakcall === 'true' ? 'annotation, splicing, normalize, peak_calling' : 'annotation, splicing, normalize'}'
     genome_fasta = '${genome_fasta}'
     detect_strand_genes_list = '${detect_strand_genes_list}'
     annot_BED = "${annot_BED}"
@@ -456,6 +481,7 @@ params {
     blacklist = '${blacklist}'
     de_novo_assembly = '${denovo}'
     peak_calling = '${peakcall}'
+    peak_calling_tool = '${peakcallTool}'
     adapters_file = '${adapterfile}'
     publish_dir_mode = 'copy'
 
@@ -640,6 +666,14 @@ flags = [
 
     function generateCSV() {
         if (samplesheetRows.length === 0) { alert("No samples added."); return; }
+
+        // Peak calling requires at least one Input Control row.
+        // The check is performed only when peak calling is enabled.
+        if (isPeakCallingEnabled() && !samplesheetRows.some(r => r.type === 'control')) {
+            alert("Warning: Peak calling is enabled, but no Input Control row is present in the samplesheet. Add at least one Input Control row before generating the samplesheet.");
+            return;
+        }
+
         const hasControls = samplesheetRows.some(r => r.type === 'control');
         let csv = hasControls
             ? 'sample,fastq_1,fastq_2,control,description\n'
@@ -718,6 +752,9 @@ flags = [
         if (!document.getElementById('csvOutput').value.trim()) {
             generateCSV();
             if (!document.getElementById('csvOutput').value.trim()) return;
+        } else if (isPeakCallingEnabled() && !samplesheetRows.some(r => r.type === 'control')) {
+            alert("Warning: Peak calling is enabled, but no Input Control row is present in the samplesheet. Add at least one Input Control row before downloading all files.");
+            return;
         }
         if (!document.getElementById('cmdOutput').value.trim()) generateCommand();
         if (!document.getElementById('cmdOutput').value.trim()) return;
@@ -790,8 +827,10 @@ flags = [
         samplesheetRows = []; renderSamplesheet(); updateExpNameLock();
         configDirty = false;
         lockedExpName = '';
+        document.getElementById('peakCalling').value = 'false';
+        document.getElementById('peakCallingTool').value = 'bardic';
         updateIndexFields();
-        updateSampleTypeUI();
+        updatePeakCallingUI();
         updateSampleTypeUI();
         switchTab(1);
     }
