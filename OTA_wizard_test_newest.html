@@ -63,6 +63,16 @@
         input:disabled, select:disabled { background: #e9ecef; cursor: not-allowed; opacity: 0.8; }
         textarea { font-family: 'Courier New', monospace; min-height: 260px; background: #f8f9fa; resize: vertical; }
         .hint { color: var(--hint); font-size: 0.82rem; margin-top: 3px; }
+        /* Click-to-open field help */
+        .label-with-help { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+        .label-with-help > label { display:inline; margin-bottom:0; }
+        .help-wrap { position:relative; display:inline-flex; align-items:center; }
+        .help-btn { width:18px; height:18px; padding:0; border:1px solid var(--primary); border-radius:50%; background:#fff; color:var(--primary); font-size:12px; font-weight:700; line-height:16px; text-align:center; cursor:pointer; flex:0 0 auto; }
+        .help-btn:hover, .help-btn:focus { background:var(--primary); color:#fff; outline:none; box-shadow:0 0 0 3px rgba(0,123,255,0.15); }
+        .help-popover { display:none; position:absolute; top:calc(100% + 8px); left:0; width:min(420px,75vw); padding:12px 14px; background:#fff; color:var(--text); border:1px solid var(--border); border-radius:7px; box-shadow:0 6px 18px rgba(0,0,0,0.16); font-size:0.82rem; font-weight:400; line-height:1.5; z-index:1000; }
+        .help-popover::before { content:''; position:absolute; top:-7px; left:5px; width:12px; height:12px; background:#fff; border-left:1px solid var(--border); border-top:1px solid var(--border); transform:rotate(45deg); }
+        .help-popover.show { display:block; }
+        .help-popover a { color:var(--primary); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
 
@@ -148,8 +158,8 @@
         <h2 style="font-size:1.3rem; margin-top: 20px;">Pipeline Configuration</h2>
         <div class="grid-2">
             <div class="form-group"><label class="req">Genome FASTA Path</label><input type="text" id="genomeFasta" placeholder="/path/to/genome.fa"></div>
-            <div class="form-group"><label class="req">Ribosomal protein genes list</label><input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab"></div>
-            <div class="form-group"><label class="req">Gene annotation BEDRC file</label><input type="text" id="annotBed" placeholder="/path/to/genes.bedrc"></div>
+            <div class="form-group"><div class="label-with-help"><label class="req">Ribosomal protein genes list</label><span class="help-wrap"><button type="button" class="help-btn" aria-label="Help for Ribosomal protein genes list" aria-expanded="false" onclick="toggleHelp(this)">?</button><span class="help-popover" role="tooltip">A column of genes that encode ribosomal proteins separated by line breaks. The ribosomal protein genes are highly conservative and by comparing reads and voting for correct or reverse complement strand one can decide whether it is native strand for experiment or RC.</span></span></div><input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab"></div>
+            <div class="form-group"><div class="label-with-help"><label class="req">Gene annotation BEDRC file</label><span class="help-wrap"><button type="button" class="help-btn" aria-label="Help for Gene annotation BEDRC file" aria-expanded="false" onclick="toggleHelp(this)">?</button><span class="help-popover" role="tooltip">A expanded BED format is used here with 7 required columns. An example for it can be found <a href="#" target="_blank" rel="noopener noreferrer" onclick="event.preventDefault();">here</a>. Replace the link target in the HTML with the BEDRC example URL when you have it.</span></span></div><input type="text" id="annotBed" placeholder="/path/to/genes.bedrc"></div>
             <div class="form-group"><label class="req">Gene annotation GTF file</label><input type="text" id="annotGtf" placeholder="/path/to/genes.gtf"></div>
             <div class="form-group"><label class="req">Organism name</label><input type="text" id="species" placeholder=""></div>
         </div>
@@ -370,6 +380,26 @@ SCIRT_chart_39_INPUT,SRR10044359.fastq.gz,,</pre>
     });
 
     function markDirty() { configDirty = true; }
+    // ===== FIELD HELP POPOVERS =====
+    function toggleHelp(button) {
+        const popover = button.parentElement.querySelector('.help-popover');
+        const isOpen = popover.classList.contains('show');
+        document.querySelectorAll('.help-popover.show').forEach(p => p.classList.remove('show'));
+        document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        if (!isOpen) { popover.classList.add('show'); button.setAttribute('aria-expanded', 'true'); }
+    }
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.help-wrap')) {
+            document.querySelectorAll('.help-popover.show').forEach(p => p.classList.remove('show'));
+            document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        }
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            document.querySelectorAll('.help-popover.show').forEach(p => p.classList.remove('show'));
+            document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        }
+    });
     function checkUnsaved() {
         if (configDirty) {
             alert("Warning: You have unsaved settings in the configuration form. Please click 'Generate nextflow.config' to apply your changes before proceeding.");
