@@ -241,6 +241,16 @@
                         <button type="button" class="help-btn" aria-label="Help for Ribosomal protein genes list" aria-expanded="false" onclick="toggleHelp(this)">?</button>
                         <span class="help-popover" role="tooltip">
                             A column of genes that encode ribosomal proteins separated by line breaks. The ribosomal protein genes are highly conservative and by comparing reads and voting for correct or reverse complement strand one can decide whether it is native strand for experiment or RC.
+    Example:
+    <pre class="csv-table">
+RpL10
+RpL10Aa
+RpL10Ab
+RpL11
+RpL12
+RpL13
+    </pre>
+</span>
                         </span>
                     </span>
                 </div>
@@ -251,12 +261,16 @@
                     <label class="req">Gene annotation BEDRC file</label>
                     <span class="help-wrap">
                         <button type="button" class="help-btn" aria-label="Help for Gene annotation BEDRC file" aria-expanded="false" onclick="toggleHelp(this)">?</button>
-                        <span class="help-popover" role="tooltip">
-                            An expanded BED format is used here with 7 required columns. An example for it can be found
-                            <a href="#" target="_blank" rel="noopener noreferrer" onclick="event.preventDefault();">here</a>.
-                            Replace the link target in the HTML with the BEDRC example URL when you have it.
-                        </span>
-                    </span>
+<span class="help-popover" role="tooltip">
+    An expanded BED format is used here with 7 required columns. Docs for it can be found
+    <a href="#" target="_blank" rel="noopener noreferrer" onclick="event.preventDefault();">here</a>.
+    Example:
+    <pre class="csv-table">
+chr2L	10003832	10008889	Ndf	+	protein_coding	tensembl
+chr2L	10004310	0005043	asRNA:CR44873	-	ncRNA	ensembl
+chr2L	10009381	10013170	Trp1	+	protein_coding	ensembl
+    </pre>
+</span>
                 </div>
                 <input type="text" id="annotBed" placeholder="/path/to/genes.bedrc">
             </div>
@@ -303,10 +317,12 @@
                                 <span class="help-popover" role="tooltip">
                                     A description string containing commands how to process the DNA-part of a read.
                                     <strong>ALWAYS</strong> has to contain <code>*</code> symbol, by it the tool identifies the DNA-part.
-                                    In addition can contain two operands either before the <code>*</code> symbol what would mean that it is applied to 5'-end of the sequence or after <code>*</code> symbol what would mean that it is applied to 3'-end sequence:
-                                    <code>s[string1|string2]</code> will substitute the suffix containing string1 on an end of DNA reads sequence to string2 and drop any reads that don't have this sequence in separate file and
-                                    <code>+(string3)</code> will add string3 to an end of reads sequence.
-                                    Normal reads that match all the condition will be distributed into two files for filtered DNA- and filtered RNA-parts.
+    Example:
+    <pre class="csv-table">
+ChAR-seq check GATC on 3'-end of DNA-parts:
+'*s[GATC|GATC]'
+    </pre>
+</span>
                                 </span>
                             </span>
                         </div>
@@ -320,10 +336,12 @@
                                 <span class="help-popover" role="tooltip">
                                     A description string containing commands how to process the RNA-part of a read.
                                     <strong>ALWAYS</strong> has to contain <code>.</code> symbol, by it the tool identifies the RNA-part.
-                                    In addition can contain two operands either before the <code>.</code> symbol what would mean that it is applied to 5'-end of the sequence or after <code>.</code> symbol what would mean that it is applied to 3'-end sequence:
-                                    <code>s[string1|string2]</code> will substitute the suffix containing string1 on an end of RNA reads sequence to string2 and drop any reads that don't have this sequence in separate file and
-                                    <code>+(string3)</code> will add string3 to an end of reads sequence.
-                                    Normal reads that match all the condition will be distributed into two files for filtered DNA- and filtered RNA-parts.
+        Example:
+    <pre class="csv-table">
+Red-C delete one occurence of CCC on 3'-end of RNA-parts:
+'s[CCC|]'
+    </pre>
+</span>
                                 </span>
                             </span>
                         </div>
@@ -461,6 +479,21 @@ rnaseq_HFFc6_imargi_1,,/data/fastq/SRR8206681_1.fastq.gz,/data/fastq/SRR8206681_
         <p class="hint" style="margin-top:8px;">Note: Your browser may prompt to allow multiple downloads when using "Download All Files".</p>
     </div>
 </div>
+
+<style>
+.csv-table {
+  font-family: monospace; /* Use a monospaced font for alignment */
+  white-space: pre;       /* Preserve whitespace and line breaks */
+  margin: 10px 0;        /* Add some margin around the table */
+  border: 1px solid #ccc;   /* Optional border for visual separation */
+  padding: 5px;            /* Optional padding inside the box */
+  overflow-x: auto;       /* Enable horizontal scrolling if content is too wide */
+}
+
+.csv-table code {
+    margin:0; /* Remove default margin from code tags */
+}
+</style>
 
 <!-- NAVIGATION FOOTER -->
 <div class="nav-footer">
