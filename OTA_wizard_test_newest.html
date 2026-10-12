@@ -158,8 +158,65 @@
         <h2 style="font-size:1.3rem; margin-top: 20px;">Pipeline Configuration</h2>
         <div class="grid-2">
             <div class="form-group"><label class="req">Genome FASTA Path</label><input type="text" id="genomeFasta" placeholder="/path/to/genome.fa"></div>
-            <div class="form-group"><div class="label-with-help"><label class="req">Ribosomal protein genes list</label><span class="help-wrap"><button type="button" class="help-btn" aria-label="Help for Ribosomal protein genes list" aria-expanded="false" onclick="toggleHelp(this)">?</button><span class="help-popover" role="tooltip">A column of genes that encode ribosomal proteins separated by line breaks. The ribosomal protein genes are highly conservative and by comparing reads and voting for correct or reverse complement strand one can decide whether it is native strand for experiment or RC.</span></span></div><input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab"></div>
-            <div class="form-group"><div class="label-with-help"><label class="req">Gene annotation BEDRC file</label><span class="help-wrap"><button type="button" class="help-btn" aria-label="Help for Gene annotation BEDRC file" aria-expanded="false" onclick="toggleHelp(this)">?</button><span class="help-popover" role="tooltip">A expanded BED format is used here with 7 required columns. An example for it can be found <a href="#" target="_blank" rel="noopener noreferrer" onclick="event.preventDefault();">here</a>. Replace the link target in the HTML with the BEDRC example URL when you have it.</span></span></div><input type="text" id="annotBed" placeholder="/path/to/genes.bedrc"></div>
+            <div class="form-group">
+                <div class="label-with-help">
+                    <label class="req">Ribosomal protein genes list</label>
+                    <span class="help-wrap">
+                        <button
+                            type="button"
+                            class="help-btn"
+                            aria-label="Help for Ribosomal protein genes list"
+                            aria-expanded="false"
+                            onclick="toggleHelp(this)"
+                        >?</button>
+                        <span class="help-popover" role="tooltip">
+                            A column of genes that encode ribosomal proteins separated by line breaks.
+                            The ribosomal protein genes are highly conservative and by comparing reads
+                            and voting for correct or reverse complement strand one can decide whether
+                            it is native strand for experiment or RC.
+                            Example:
+                            <pre class="csv-table">
+RpL10
+RpL10Aa
+RpL10Ab
+RpL11
+RpL12
+RpL13
+                            </pre>
+                        </span>
+                    </span>
+                </div>
+                <input type="text" id="lineageGenes" placeholder="/path/to/RPLS.tab" placeholder="/path/to/RPLS.tab"></div>
+            <div class="form-group">
+                <div class="label-with-help">
+                    <label class="req">Gene annotation BEDRC file</label>
+                    <span class="help-wrap">
+                        <button
+                            type="button"
+                            class="help-btn"
+                            aria-label="Help for Gene annotation BEDRC file"
+                            aria-expanded="false"
+                            onclick="toggleHelp(this)"
+                        >?</button>
+                        <span class="help-popover" role="tooltip">
+                            An expanded BED format is used here with 7 required columns.
+                            Docs for it can be found
+                            <a
+                                href="#"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onclick="event.preventDefault();"
+                            >here</a>.
+                            Example:
+                            <pre class="csv-table">
+chr1    17368   17436   hsa-mir-6859-1  -       miRNA   GB_snomirna
+chr1    17369   17436   MIR6859-1       -       miRNA   gencode
+chr1    6891265 7049775 MAP3K4  -       protein_coding  ensembl
+                            </pre>
+                        </span>
+                    </span>
+                </div>
+                <input type="text" id="annotBed" placeholder="/path/to/genes.bedrc" placeholder="/path/to/genes.bedrc"></div>
             <div class="form-group"><label class="req">Gene annotation GTF file</label><input type="text" id="annotGtf" placeholder="/path/to/genes.gtf"></div>
             <div class="form-group"><label class="req">Organism name</label><input type="text" id="species" placeholder=""></div>
         </div>
@@ -222,14 +279,14 @@
         <div class="example-block">
             <h4 style="margin:0 0 5px;">One-to-all (OTA) methods</h4>
             <p style="margin:0 0 5px;">For one-to-all methods, use the following format:</p>
-            <pre>sample,fastq_1,fastq_2,description
+            <pre class="csv-table">sample,fastq_1,fastq_2,description
 SCIRT_chart_39,SRR10044362.fastq.gz,,tissue:"K562"</pre>
             <p style="margin:8px 0 0;">If you have single-end data, leave <code>fastq_2</code> empty. For paired-end data, include both files.</p>
         </div>
         <div class="example-block">
             <h4 style="margin:0 0 5px;">OTA with input controls</h4>
             <p style="margin:0 0 5px;">To specify input controls for OTA methods:</p>
-            <pre>sample,fastq_1,fastq_2,control,description
+            <pre class="csv-table">sample,fastq_1,fastq_2,control,description
 SCIRT_chart_39,SRR10044362.fastq.gz,,SCIRT_chart_39_INPUT,tissue:"K562"
 SCIRT_chart_39_INPUT,SRR10044359.fastq.gz,,</pre>
             <p style="margin:8px 0 0;">Use the <code>control</code> column to specify which sample serves as the input control.</p>
@@ -308,6 +365,22 @@ SCIRT_chart_39_INPUT,SRR10044359.fastq.gz,,</pre>
         <p class="hint" style="margin-top:8px;">Note: Your browser may prompt to allow multiple downloads when using "Download All Files".</p>
     </div>
 </div>
+
+
+<style>
+    .csv-table {
+        font-family: monospace;
+        white-space: pre;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        padding: 5px;
+        overflow-x: auto;
+    }
+
+    .csv-table code {
+        margin: 0;
+    }
+</style>
 
 <!-- NAVIGATION FOOTER -->
 <div class="nav-footer">
